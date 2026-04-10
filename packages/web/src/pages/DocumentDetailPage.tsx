@@ -75,6 +75,12 @@ export function DocumentDetailPage() {
   const totalCredited = finalizedCreditNotes.reduce((acc, cn) => acc + parseFloat(cn.totalGross), 0);
   const openAmount = parseFloat(doc.totalGross) - totalPaid - totalCredited;
 
+  // Derive effective display status — credit notes can settle an invoice without changing DB status
+  const effectiveStatus =
+    doc.documentType === "INVOICE" && ["PARTIAL", "SENT", "FINAL"].includes(doc.status) && openAmount <= 0
+      ? "PAID"
+      : doc.status;
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -89,7 +95,7 @@ export function DocumentDetailPage() {
                 {doc.documentNumber ?? "(Entwurf)"}
               </h1>
               <TypeBadge type={doc.documentType as DocumentType} />
-              <StatusBadge status={doc.status as any} />
+              <StatusBadge status={effectiveStatus as any} />
             </div>
             <p className="text-sm text-gray-500 mt-0.5">{customerName}</p>
           </div>
