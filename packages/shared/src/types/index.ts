@@ -209,6 +209,32 @@ export interface Document {
   payments?: Payment[];
 }
 
+export interface PdfSettings {
+  accentColor: string;
+  headerBgColor: string;
+  altRowColor: string;
+  bodyFontSize: number;
+  titleFontSize: number;
+  paddingH: number;
+  paddingTop: number;
+  paddingBottom: number;
+  logoWidth: number;
+  logoHeight: number;
+}
+
+export const DEFAULT_PDF_SETTINGS: PdfSettings = {
+  accentColor: "#b45309",
+  headerBgColor: "#fef3c7",
+  altRowColor: "#fffbeb",
+  bodyFontSize: 9,
+  titleFontSize: 18,
+  paddingH: 50,
+  paddingTop: 40,
+  paddingBottom: 60,
+  logoWidth: 100,
+  logoHeight: 40,
+};
+
 export interface CompanySettings {
   id: number;
   name: string;
@@ -228,6 +254,7 @@ export interface CompanySettings {
   logoPath: string | null;
   defaultCurrency: string;
   defaultPaymentDays: number;
+  pdfSettings: PdfSettings | null;
   createdAt: string;
   updatedAt: string;
 }
