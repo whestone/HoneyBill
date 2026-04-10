@@ -1,0 +1,27 @@
+{
+  "name": "honeybill",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Single-tenant billing software with ZUGFeRD/XRechnung e-invoice support",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n API,WEB -c cyan,magenta \"pnpm --filter @honeybill/api dev\" \"pnpm --filter @honeybill/web dev\"",
+    "build": "pnpm --filter @honeybill/shared build && pnpm --filter @honeybill/api build && pnpm --filter @honeybill/web build",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "test": "pnpm --recursive test",
+    "migrate": "pnpm --filter @honeybill/api migrate",
+    "setup": "pnpm install && pnpm --filter @honeybill/api migrate && pnpm --filter @honeybill/api seed"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["@biomejs/biome", "argon2", "better-sqlite3", "esbuild"]
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "concurrently": "^9.1.0",
+    "typescript": "^5.7.3"
+  }
+}
