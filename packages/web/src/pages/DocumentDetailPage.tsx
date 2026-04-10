@@ -10,6 +10,7 @@ import {
   useConvertToInvoice,
   useCreateCreditNote,
   useCreateDeliveryNote,
+  useRelatedDocuments,
 } from "@/api/hooks/useDocuments";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
@@ -17,7 +18,7 @@ import { StatusBadge, TypeBadge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { PdfPreview } from "@/components/pdf/PdfPreview";
 import { formatEur, DOCUMENT_TYPE_LABELS } from "@honeybill/shared";
-import type { CompanySettings, DocumentType } from "@honeybill/shared";
+import type { CompanySettings, Document, DocumentType } from "@honeybill/shared";
 import { ArrowLeft, CheckCircle, CreditCard, Edit2, FileText, Send, Truck, Trash2, XCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -30,6 +31,7 @@ export function DocumentDetailPage() {
   const [showPdf, setShowPdf] = useState(false);
 
   const { data: doc, isLoading } = useDocument(Number(id));
+  const { data: relatedDocs = [] } = useRelatedDocuments(Number(id));
   const { data: company } = useQuery<CompanySettings>({
     queryKey: ["company-settings"],
     queryFn: () => api.get("/settings/company"),
@@ -67,7 +69,11 @@ export function DocumentDetailPage() {
     (acc, p) => acc + parseFloat(p.amount),
     0
   );
-  const openAmount = parseFloat(doc.totalGross) - totalPaid;
+  const finalizedCreditNotes = relatedDocs.filter(
+    (d) => d.documentType === "CREDIT_NOTE" && ["FINAL", "SENT", "PAID"].includes(d.status)
+  );
+  const totalCredited = finalizedCreditNotes.reduce((acc, cn) => acc + parseFloat(cn.totalGross), 0);
+  const openAmount = parseFloat(doc.totalGross) - totalPaid - totalCredited;
 
   return (
     <div className="p-6 space-y-6">
@@ -298,9 +304,68 @@ export function DocumentDetailPage() {
                         </td>
                       </tr>
                     ))}
+                  {finalizedCreditNotes.map((cn) => (
+                    <tr key={`cn-${cn.id}`} className="border-b border-gray-50 bg-red-50/40">
+                      <td className="table-cell">{cn.issueDate ?? cn.createdAt?.slice(0, 10) ?? "—"}</td>
+                      <td className="table-cell text-gray-500">
+                        <Link to="/documents/$id" params={{ id: String(cn.id) }} className="text-honey-600 hover:underline text-xs">
+                          Gutschrift {cn.documentNumber ?? `#${cn.id}`}
+                        </Link>
+                      </td>
+                      <td className="table-cell text-gray-400 text-xs">Gutschrift</td>
+                      <td className="table-cell text-right font-medium text-red-600">
+                        −{formatEur(cn.totalGross)}
+                      </td>
+                    </tr>
+                  ))}
                   </tbody>
                 </table>
               )}
+            </div>
+          )}
+          {/* Related documents */}
+          {relatedDocs.length > 0 && (
+            <div className="card overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100">
+                <h2 className="font-semibold text-sm text-gray-900">Verknüpfte Belege</h2>
+              </div>
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="table-header">Nummer</th>
+                    <th className="table-header">Typ</th>
+                    <th className="table-header">Status</th>
+                    <th className="table-header text-right">Betrag</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {relatedDocs.map((rel) => {
+                    const isCreditNote = rel.documentType === "CREDIT_NOTE";
+                    return (
+                      <tr key={rel.id} className="border-b border-gray-50 hover:bg-gray-50">
+                        <td className="table-cell">
+                          <Link
+                            to="/documents/$id"
+                            params={{ id: String(rel.id) }}
+                            className="text-honey-600 hover:underline font-mono text-xs"
+                          >
+                            {rel.documentNumber ?? "(Entwurf)"}
+                          </Link>
+                        </td>
+                        <td className="table-cell">
+                          <TypeBadge type={rel.documentType as DocumentType} />
+                        </td>
+                        <td className="table-cell">
+                          <StatusBadge status={rel.status as any} />
+                        </td>
+                        <td className={`table-cell text-right font-medium ${isCreditNote ? "text-red-600" : ""}`}>
+                          {isCreditNote ? "−" : ""}{formatEur(rel.totalGross)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
