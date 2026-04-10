@@ -315,8 +315,29 @@ export async function documentRoutes(app: FastifyInstance) {
 
   // DELETE /api/v1/documents/:id/payments/:paymentId
   app.delete("/:id/payments/:paymentId", { onRequest: [app.authenticate] }, async (req, reply) => {
-    const { paymentId } = req.params as { id: string; paymentId: string };
+    const { id, paymentId } = req.params as { id: string; paymentId: string };
+    const doc = await db.query.documents.findFirst({ where: eq(documents.id, Number(id)) });
+    if (!doc) return reply.status(404).send({ message: "Beleg nicht gefunden" });
+
     await db.delete(payments).where(eq(payments.id, Number(paymentId)));
+
+    // Recalculate document status
+    const remaining = await db.query.payments.findMany({ where: eq(payments.documentId, Number(id)) });
+    const totalPaid = remaining.reduce(
+      (acc, p) => acc.plus(new Decimal(p.amount)),
+      new Decimal(0)
+    );
+    const totalGross = new Decimal(doc.totalGross);
+    let newStatus: string;
+    if (totalPaid.greaterThanOrEqualTo(totalGross)) {
+      newStatus = "PAID";
+    } else if (totalPaid.greaterThan(0)) {
+      newStatus = "PARTIAL";
+    } else {
+      newStatus = "SENT";
+    }
+    await db.update(documents).set({ status: newStatus, updatedAt: new Date().toISOString() }).where(eq(documents.id, Number(id)));
+
     return reply.status(204).send();
   });
 
