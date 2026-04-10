@@ -251,22 +251,26 @@ export function InvoicePDF({ doc, company }: InvoicePDFProps) {
         </View>
 
         {/* Payment info */}
-        {(company.bankIban || doc.paymentTermsText) && (
+        {(company.bankIban || company.bankBic || doc.paymentTermsText || doc.dueDate || doc.paymentDays) && (
           <View style={styles.paymentBlock}>
             <Text style={styles.paymentTitle}>Zahlungsinformationen</Text>
             <View style={styles.paymentRow}>
-              {doc.paymentTermsText && (
+              {doc.paymentTermsText ? (
                 <View style={styles.paymentItem}>
                   <Text style={styles.paymentLabel}>Zahlungsziel:</Text>
                   <Text>{doc.paymentTermsText}</Text>
                 </View>
-              )}
-              {doc.dueDate && !doc.paymentTermsText && (
+              ) : doc.paymentDays != null ? (
+                <View style={styles.paymentItem}>
+                  <Text style={styles.paymentLabel}>Zahlungsziel:</Text>
+                  <Text>{doc.paymentDays} Tage{doc.dueDate ? ` (bis ${formatDate(doc.dueDate)})` : ""}</Text>
+                </View>
+              ) : doc.dueDate ? (
                 <View style={styles.paymentItem}>
                   <Text style={styles.paymentLabel}>Fällig bis:</Text>
                   <Text>{formatDate(doc.dueDate)}</Text>
                 </View>
-              )}
+              ) : null}
               {company.bankIban && (
                 <View style={styles.paymentItem}>
                   <Text style={styles.paymentLabel}>IBAN:</Text>
