@@ -100,6 +100,14 @@ export function useCreateCreditNote() {
   });
 }
 
+export function useRelatedDocuments(id: number) {
+  return useQuery<Document[]>({
+    queryKey: ["documents", id, "related"],
+    queryFn: () => api.get(`/documents/${id}/related`),
+    enabled: id > 0,
+  });
+}
+
 export function useCreateDeliveryNote() {
   const qc = useQueryClient();
   return useMutation({

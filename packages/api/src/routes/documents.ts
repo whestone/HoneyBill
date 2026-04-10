@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import Decimal from "decimal.js";
 import { db } from "../db/index.js";
 import { documentFiles, documentLineItems, documentTaxLines, documents, payments } from "../db/schema.js";
@@ -278,6 +278,20 @@ export async function documentRoutes(app: FastifyInstance) {
       Number(payload.sub)
     );
     return reply.status(201).send(delivery);
+  });
+
+  // GET /api/v1/documents/:id/related
+  app.get("/:id/related", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const rows = await db.query.documents.findMany({
+      where: or(
+        eq(documents.sourceDocumentId, Number(id)),
+        eq(documents.cancelsDocumentId, Number(id))
+      ),
+      with: { customer: true },
+      orderBy: [desc(documents.createdAt)],
+    });
+    return reply.send(rows);
   });
 
   // GET /api/v1/documents/:id/payments
