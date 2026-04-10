@@ -283,10 +283,30 @@ export async function documentRoutes(app: FastifyInstance) {
   // GET /api/v1/documents/:id/related
   app.get("/:id/related", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { id } = req.params as { id: string };
+    const numId = Number(id);
+
+    // Fetch the current doc to find its parents
+    const self = await db.query.documents.findFirst({ where: eq(documents.id, numId) });
+    if (!self) return reply.send([]);
+
+    const parentIds = [self.sourceDocumentId, self.cancelsDocumentId].filter((x): x is number => x != null);
+
+    // Build OR conditions: children, parents, siblings (share a parent with this doc)
+    const conditions = [
+      or(eq(documents.sourceDocumentId, numId), eq(documents.cancelsDocumentId, numId)),
+    ];
+    if (parentIds.length > 0) {
+      conditions.push(inArray(documents.id, parentIds));
+      conditions.push(or(
+        inArray(documents.sourceDocumentId, parentIds),
+        inArray(documents.cancelsDocumentId, parentIds),
+      ) as any);
+    }
+
     const rows = await db.query.documents.findMany({
-      where: or(
-        eq(documents.sourceDocumentId, Number(id)),
-        eq(documents.cancelsDocumentId, Number(id))
+      where: and(
+        sql`${documents.id} != ${numId}`,
+        or(...conditions),
       ),
       with: { customer: true },
       orderBy: [desc(documents.createdAt)],
