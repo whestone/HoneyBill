@@ -4,7 +4,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { db } from "../db/index.js";
 import { companySettings, numberSeries, taxRates } from "../db/schema.js";
-import { UpdateCompanySettingsSchema, UpdateNumberSeriesSchema } from "@honeybill/shared";
+import { UpdateCompanySettingsSchema, UpdateNumberSeriesSchema, UpdatePdfSettingsSchema } from "@honeybill/shared";
 import { previewNextNumber } from "../services/numbering.service.js";
 import { sqlite } from "../db/index.js";
 import { config } from "../config.js";
@@ -14,7 +14,12 @@ export async function settingsRoutes(app: FastifyInstance) {
   // GET /api/v1/settings/company
   app.get("/company", { onRequest: [app.authenticate] }, async (_req, reply) => {
     const [row] = await db.select().from(companySettings).limit(1);
-    return reply.send(row ?? {});
+    if (!row) return reply.send({});
+    const parsed = {
+      ...row,
+      pdfSettings: row.pdfSettings ? JSON.parse(row.pdfSettings) : null,
+    };
+    return reply.send(parsed);
   });
 
   // PUT /api/v1/settings/company
@@ -31,6 +36,23 @@ export async function settingsRoutes(app: FastifyInstance) {
       .where(eq(companySettings.id, 1))
       .returning();
     return reply.send(row);
+  });
+
+  // PUT /api/v1/settings/company/pdf
+  app.put("/company/pdf", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const input = UpdatePdfSettingsSchema.parse(req.body);
+    const existing = await db.select().from(companySettings).limit(1);
+    const json = JSON.stringify(input);
+    if (existing.length === 0) {
+      const [row] = await db.insert(companySettings).values({ id: 1, pdfSettings: json } as any).returning();
+      return reply.send({ ...row, pdfSettings: input });
+    }
+    const [row] = await db
+      .update(companySettings)
+      .set({ pdfSettings: json, updatedAt: new Date().toISOString() })
+      .where(eq(companySettings.id, 1))
+      .returning();
+    return reply.send({ ...row, pdfSettings: input });
   });
 
   // POST /api/v1/settings/company/logo (multipart)

@@ -28,5 +28,19 @@ export const UpdateNumberSeriesSchema = z.object({
   resetYearly: z.boolean().default(true),
 });
 
+export const UpdatePdfSettingsSchema = z.object({
+  accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#b45309"),
+  headerBgColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#fef3c7"),
+  altRowColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#fffbeb"),
+  bodyFontSize: z.number().int().min(6).max(14).default(9),
+  titleFontSize: z.number().int().min(10).max(32).default(18),
+  paddingH: z.number().int().min(20).max(80).default(50),
+  paddingTop: z.number().int().min(20).max(80).default(40),
+  paddingBottom: z.number().int().min(30).max(100).default(60),
+  logoWidth: z.number().int().min(40).max(200).default(100),
+  logoHeight: z.number().int().min(20).max(100).default(40),
+});
+
 export type UpdateCompanySettingsInput = z.infer<typeof UpdateCompanySettingsSchema>;
 export type UpdateNumberSeriesInput = z.infer<typeof UpdateNumberSeriesSchema>;
+export type UpdatePdfSettingsInput = z.infer<typeof UpdatePdfSettingsSchema>;
