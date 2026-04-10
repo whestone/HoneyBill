@@ -18,12 +18,13 @@ async function request<T>(
 ): Promise<T> {
   const token = useAuthStore.getState().token;
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
   if (options.body instanceof FormData) {
-    delete headers["Content-Type"]; // let browser set multipart boundary
+    // let browser set multipart boundary
+  } else if (options.body !== undefined) {
+    headers["Content-Type"] = "application/json";
   }
 
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
