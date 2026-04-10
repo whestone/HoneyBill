@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "HoneyBill API (Fastify, Port 3001)",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@honeybill/api", "dev"],
+      "port": 3001
+    },
+    {
+      "name": "HoneyBill Web (Vite, Port 5173)",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@honeybill/web", "dev"],
+      "port": 5173
+    },
+    {
+      "name": "HoneyBill (API + Web, beide gleichzeitig)",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev"],
+      "port": 5173
+    }
+  ]
+}
