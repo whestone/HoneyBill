@@ -62,7 +62,8 @@ export async function openItemsRoutes(app: FastifyInstance) {
       };
     });
 
-    const filtered = q.overdue === "true" ? openItems.filter((i) => i.isOverdue) : openItems;
+    const withOpen = openItems.filter((i) => new Decimal(i.openAmount).greaterThan(0));
+    const filtered = q.overdue === "true" ? withOpen.filter((i) => i.isOverdue) : withOpen;
 
     return reply.send({
       data: filtered,
