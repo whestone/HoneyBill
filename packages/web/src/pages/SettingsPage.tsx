@@ -222,7 +222,7 @@ const MOCK_NUMBER: Record<DocumentType, string> = {
 function mockDoc(docType: DocumentType): HBDocument {
   return {
     id: 0, documentType: docType, documentNumber: MOCK_NUMBER[docType], status: "FINAL",
-    customerId: 0, customerSnapshot: null,
+    customerId: 0, customerSnapshot: null, layoutOverride: null,
     issueDate: "2026-04-10", deliveryDate: docType === "DELIVERY_NOTE" ? "2026-04-11" : null, deliveryDateEnd: null,
     dueDate: docType === "INVOICE" ? "2026-05-10" : null, quoteValidUntil: docType === "QUOTE" ? "2026-05-10" : null,
     sourceDocumentId: null, cancelsDocumentId: null,
@@ -266,13 +266,28 @@ function mockDoc(docType: DocumentType): HBDocument {
 
 const DOC_TYPES: DocumentType[] = ["INVOICE", "QUOTE", "DELIVERY_NOTE", "CREDIT_NOTE"];
 
-const LAYOUT_TOGGLES: { key: keyof DocumentLayoutSettings; label: string }[] = [
-  { key: "showPrices", label: "Preise anzeigen" },
-  { key: "showTax", label: "MwSt. anzeigen" },
-  { key: "showDiscount", label: "Rabatt-Spalte" },
+const COLUMN_TOGGLES: { key: keyof DocumentLayoutSettings; label: string }[] = [
+  { key: "colPositionNr", label: "Lfd. Nr." },
+  { key: "colDate", label: "Datum" },
+  { key: "colQuantity", label: "Menge" },
+  { key: "colUnit", label: "Einheit" },
+  { key: "colPrice", label: "Preis" },
+  { key: "colDiscount", label: "Rabatt" },
+  { key: "colTax", label: "USt. %" },
+  { key: "colTaxAmount", label: "USt. Betrag" },
+  { key: "colNetAmount", label: "Netto" },
+  { key: "colGrossAmount", label: "Brutto" },
+];
+
+const SECTION_TOGGLES: { key: keyof DocumentLayoutSettings; label: string }[] = [
   { key: "showTotals", label: "Summenblock" },
   { key: "showPaymentInfo", label: "Zahlungsinformationen" },
-  { key: "showPositionNumbers", label: "Positionsnummern" },
+];
+
+const TOTAL_DISPLAY_OPTIONS: { value: string; label: string }[] = [
+  { value: "gross", label: "Brutto" },
+  { value: "net", label: "Netto" },
+  { value: "both", label: "Brutto & Netto" },
 ];
 
 function PdfLayoutTab() {
@@ -363,25 +378,72 @@ function PdfLayoutTab() {
           ))}
         </div>
 
-        {/* Layout toggles per doc type */}
-        <div className="card p-5 space-y-3">
+        {/* Layout settings per doc type */}
+        <div className="card p-5 space-y-4">
           <h2 className="font-semibold text-gray-900 text-sm">
             Layout: {DOCUMENT_TYPE_LABELS[previewType]}
           </h2>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-            {LAYOUT_TOGGLES.map((t) => (
-              <label key={t.key} className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={currentLayout[t.key] as boolean}
-                  onChange={(e) => setLayout(t.key, e.target.checked as any)}
-                  className="accent-honey-600"
-                />
-                {t.label}
-              </label>
-            ))}
+
+          {/* Column visibility */}
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Sichtbare Spalten</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+              {COLUMN_TOGGLES.map((t) => (
+                <label key={t.key} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={currentLayout[t.key] as boolean}
+                    onChange={(e) => setLayout(t.key, e.target.checked as any)}
+                    className="accent-honey-600"
+                  />
+                  {t.label}
+                </label>
+              ))}
+            </div>
           </div>
-          <div className="pt-2">
+
+          {/* Sections */}
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Abschnitte</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+              {SECTION_TOGGLES.map((t) => (
+                <label key={t.key} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={currentLayout[t.key] as boolean}
+                    onChange={(e) => setLayout(t.key, e.target.checked as any)}
+                    className="accent-honey-600"
+                  />
+                  {t.label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Total display mode */}
+          {currentLayout.showTotals && (
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Gesamtbetrag anzeigen als</p>
+              <div className="flex flex-col gap-1.5">
+                {TOTAL_DISPLAY_OPTIONS.map((o) => (
+                  <label key={o.value} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`totalDisplay-${previewType}`}
+                      value={o.value}
+                      checked={currentLayout.totalDisplay === o.value}
+                      onChange={() => setLayout("totalDisplay", o.value as any)}
+                      className="accent-honey-600"
+                    />
+                    {o.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Closing text */}
+          <div>
             <label className="label text-xs">Schlusstext</label>
             <textarea
               rows={3}

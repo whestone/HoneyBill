@@ -29,12 +29,19 @@ export const UpdateNumberSeriesSchema = z.object({
 });
 
 const DocumentLayoutSettingsSchema = z.object({
-  showPrices: z.boolean().default(true),
-  showTax: z.boolean().default(true),
-  showDiscount: z.boolean().default(true),
+  colPositionNr: z.boolean().default(true),
+  colDate: z.boolean().default(false),
+  colQuantity: z.boolean().default(true),
+  colUnit: z.boolean().default(true),
+  colPrice: z.boolean().default(true),
+  colDiscount: z.boolean().default(true),
+  colTax: z.boolean().default(true),
+  colTaxAmount: z.boolean().default(false),
+  colNetAmount: z.boolean().default(true),
+  colGrossAmount: z.boolean().default(false),
   showTotals: z.boolean().default(true),
   showPaymentInfo: z.boolean().default(true),
-  showPositionNumbers: z.boolean().default(true),
+  totalDisplay: z.enum(["gross", "net", "both"]).default("both"),
   closingText: z.string().max(2000).default(""),
 });
 
