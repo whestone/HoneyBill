@@ -509,13 +509,7 @@ function EmailTab() {
     val: NonNullable<UpdateEmailSettingsInput["smtp"]>[K]
   ) => setSettings((s) => ({ ...s, smtp: { ...(s.smtp ?? { host: "", port: 587, secure: false, user: "", password: "", fromName: "", fromAddress: "" }), [key]: val } }));
 
-  const insertPlaceholder = (field: "subject" | "body", placeholder: string) => {
-    setSettings((s) => ({
-      ...s,
-      [field === "subject" ? "defaultSubject" : "defaultBody"]:
-        (field === "subject" ? s.defaultSubject : s.defaultBody) + placeholder,
-    }));
-  };
+
 
   if (isLoading) return <div className="py-8 text-center text-gray-400">Laden…</div>;
 
@@ -625,44 +619,40 @@ function EmailTab() {
       )}
 
       {/* E-Mail-Vorlagen */}
-      <div className="card p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900">Vorlagen</h2>
-          <div className="flex flex-wrap gap-1">
-            {EMAIL_PLACEHOLDERS.map((p) => (
-              <span key={p.key} className="text-xs text-gray-500 border border-gray-200 rounded px-1.5 py-0.5 font-mono">{p.key}</span>
-            ))}
+      <div className="card p-5">
+        <h2 className="font-semibold text-gray-900 mb-4">Vorlagen</h2>
+        <div className="flex gap-6">
+          {/* Fields */}
+          <div className="flex-1 space-y-4">
+            <div>
+              <label className="label">Standard-Betreff</label>
+              <input
+                value={settings.defaultSubject}
+                onChange={(e) => setSettings((s) => ({ ...s, defaultSubject: e.target.value }))}
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="label">Standard-E-Mail-Text</label>
+              <textarea
+                rows={10}
+                value={settings.defaultBody}
+                onChange={(e) => setSettings((s) => ({ ...s, defaultBody: e.target.value }))}
+                className="input font-mono text-xs w-full resize-y"
+              />
+            </div>
           </div>
-        </div>
-        <div>
-          <label className="label">Standard-Betreff</label>
-          <div className="flex gap-2">
-            <input
-              value={settings.defaultSubject}
-              onChange={(e) => setSettings((s) => ({ ...s, defaultSubject: e.target.value }))}
-              className="input flex-1"
-            />
-          </div>
-          <div className="flex gap-1 mt-1 flex-wrap">
-            {EMAIL_PLACEHOLDERS.map((p) => (
-              <button key={p.key} type="button" onClick={() => insertPlaceholder("subject", p.key)}
-                className="text-xs text-honey-700 hover:underline">{p.label}</button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <label className="label">Standard-E-Mail-Text</label>
-          <textarea
-            rows={8}
-            value={settings.defaultBody}
-            onChange={(e) => setSettings((s) => ({ ...s, defaultBody: e.target.value }))}
-            className="input font-mono text-xs w-full resize-y"
-          />
-          <div className="flex gap-1 mt-1 flex-wrap">
-            {EMAIL_PLACEHOLDERS.map((p) => (
-              <button key={p.key} type="button" onClick={() => insertPlaceholder("body", p.key)}
-                className="text-xs text-honey-700 hover:underline">{p.label}</button>
-            ))}
+          {/* Placeholder sidebar */}
+          <div className="w-56 shrink-0 border-l border-gray-100 pl-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Platzhalter</p>
+            <div className="space-y-2">
+              {EMAIL_PLACEHOLDERS.map((p) => (
+                <div key={p.key}>
+                  <span className="font-mono text-xs text-gray-700 block leading-tight">{p.key}</span>
+                  <span className="text-xs text-gray-400">{p.example}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
