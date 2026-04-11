@@ -53,7 +53,7 @@ export function DocumentDetailPage() {
     return <div className="p-6 text-gray-400">Laden…</div>;
   }
 
-  const customer = (doc.customerSnapshot ?? doc.customer) as any;
+  const customer = parseCustomer(doc);
   const customerName =
     customer?.companyName ||
     `${customer?.firstName ?? ""} ${customer?.lastName ?? ""}`.trim() ||
@@ -465,8 +465,14 @@ export function DocumentDetailPage() {
 
 // ─── Placeholder resolution ───────────────────────────────────────────────────
 
+function parseCustomer(doc: Document): any {
+  const raw = doc.customerSnapshot ?? (doc as any).customer;
+  if (typeof raw === "string") { try { return JSON.parse(raw); } catch { return null; } }
+  return raw ?? null;
+}
+
 function resolvePlaceholders(template: string, doc: Document, company: CompanySettings): string {
-  const customer = (doc.customerSnapshot ?? (doc as any).customer) as any;
+  const customer = parseCustomer(doc);
   const customerName =
     customer?.companyName ||
     `${customer?.firstName ?? ""} ${customer?.lastName ?? ""}`.trim() ||
@@ -506,7 +512,7 @@ function SendEmailModal({
   open, onClose, doc, company,
 }: { open: boolean; onClose: () => void; doc: Document; company: CompanySettings }) {
   const emailSettings = company.emailSettings ?? DEFAULT_EMAIL_SETTINGS;
-  const customer = (doc.customerSnapshot ?? (doc as any).customer) as any;
+  const customer = parseCustomer(doc);
   const customerDisplayName =
     customer?.companyName ||
     [customer?.firstName, customer?.lastName].filter(Boolean).join(" ") ||
