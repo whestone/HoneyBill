@@ -169,7 +169,7 @@ function CreateDocumentModal({
   const handleCreate = () => {
     if (!customerId) return;
     create.mutate(
-      { documentType: docType, customerId: Number(customerId), lineItems: [] },
+      { documentType: docType, customerId: Number(customerId), lineItems: [], currency: "EUR" },
       { onSuccess: (doc) => { onClose(); onCreated(doc.id); } }
     );
   };

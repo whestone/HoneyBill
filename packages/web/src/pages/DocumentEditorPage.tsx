@@ -633,7 +633,7 @@ function ProductAutocomplete({
   onSelect,
 }: {
   query: string;
-  anchorRef: React.RefObject<HTMLDivElement>;
+  anchorRef: React.RefObject<HTMLDivElement | null>;
   onSelect: (p: Product) => void;
 }) {
   const [style, setStyle] = useState<React.CSSProperties>({});
