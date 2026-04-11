@@ -13,6 +13,23 @@ const LineItemSchema = z.object({
   taxRateId: z.number().int().positive().nullable().optional(),
 });
 
+const DocumentLayoutOverrideSchema = z.object({
+  colPositionNr: z.boolean().optional(),
+  colDate: z.boolean().optional(),
+  colQuantity: z.boolean().optional(),
+  colUnit: z.boolean().optional(),
+  colPrice: z.boolean().optional(),
+  colDiscount: z.boolean().optional(),
+  colTax: z.boolean().optional(),
+  colTaxAmount: z.boolean().optional(),
+  colNetAmount: z.boolean().optional(),
+  colGrossAmount: z.boolean().optional(),
+  showTotals: z.boolean().optional(),
+  showPaymentInfo: z.boolean().optional(),
+  totalDisplay: z.enum(["gross", "net", "both"]).optional(),
+  closingText: z.string().max(2000).optional(),
+}).nullable().optional();
+
 export const CreateDocumentSchema = z.object({
   documentType: z.enum(["QUOTE", "DELIVERY_NOTE", "INVOICE", "CREDIT_NOTE"]),
   customerId: z.number().int().positive(),
@@ -27,6 +44,8 @@ export const CreateDocumentSchema = z.object({
   templateId: z.number().int().positive().nullable().optional(),
   einvoiceProfile: z.enum(["ZUGFERD_EXTENDED", "XRECHNUNG"]).nullable().optional(),
   leitwegId: z.string().max(100).nullable().optional(),
+  globalDiscountPct: z.string().regex(/^\d+(\.\d{1,4})?$/).default("0.00").optional(),
+  layoutOverride: DocumentLayoutOverrideSchema,
   internalNotes: z.string().max(5000).nullable().optional(),
   lineItems: z.array(LineItemSchema).min(0),
 });

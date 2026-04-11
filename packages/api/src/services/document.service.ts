@@ -61,6 +61,8 @@ export async function createDocument(
       templateId: input.templateId ?? null,
       einvoiceProfile: input.einvoiceProfile ?? null,
       leitwegId: input.leitwegId ?? null,
+      globalDiscountPct: input.globalDiscountPct ?? "0.00",
+      layoutOverride: input.layoutOverride ? JSON.stringify(input.layoutOverride) : null,
       internalNotes: input.internalNotes ?? null,
       createdBy: userId,
       status: "DRAFT",
@@ -93,12 +95,13 @@ export async function updateDocument(
     throw new Error("Only DRAFT documents can be edited");
   }
 
-  const { lineItems, ...docFields } = input;
+  const { lineItems, layoutOverride, ...docFields } = input;
 
   await db
     .update(documents)
     .set({
       ...docFields,
+      ...(layoutOverride !== undefined ? { layoutOverride: layoutOverride ? JSON.stringify(layoutOverride) : null } : {}),
       updatedAt: new Date().toISOString(),
     })
     .where(eq(documents.id, docId));
@@ -161,6 +164,9 @@ export async function finalizeDocument(db: DB, docId: number, userId: number | n
   const docNumber = assignNextNumber(sqlite, doc.documentType as DocumentType, issueDate);
 
   // Build tax breakdown
+  const globalDiscountPct = new Decimal(doc.globalDiscountPct ?? "0.00");
+  const discountFactor = new Decimal(1).minus(globalDiscountPct.div(100));
+
   const taxMap = new Map<string, { taxRateId: number | null; taxCategory: string; net: Decimal; tax: Decimal }>();
   for (const li of updatedLineItems) {
     const key = li.taxRatePct;
@@ -173,6 +179,12 @@ export async function finalizeDocument(db: DB, docId: number, userId: number | n
     existing.net = existing.net.plus(new Decimal(li.lineNet));
     existing.tax = existing.tax.plus(new Decimal(li.lineTax));
     taxMap.set(key, existing);
+  }
+
+  // Apply global discount proportionally to each tax group
+  for (const [, data] of taxMap) {
+    data.net = data.net.mul(discountFactor).toDecimalPlaces(2, 4);
+    data.tax = data.tax.mul(discountFactor).toDecimalPlaces(2, 4);
   }
 
   const subtotalNet = Array.from(taxMap.values())
@@ -365,6 +377,10 @@ async function upsertLineItems(
 }
 
 async function recalcTotals(db: DB, docId: number) {
+  const doc = await db.query.documents.findFirst({ where: eq(documents.id, docId) });
+  const globalDiscountPct = new Decimal(doc?.globalDiscountPct ?? "0.00");
+  const discountFactor = new Decimal(1).minus(globalDiscountPct.div(100));
+
   const lines = await db.query.documentLineItems.findMany({
     where: and(
       eq(documentLineItems.documentId, docId),
@@ -372,8 +388,11 @@ async function recalcTotals(db: DB, docId: number) {
     ),
   });
 
-  const subtotalNet = lines.reduce((acc, li) => acc.plus(new Decimal(li.lineNet)), new Decimal(0)).toFixed(2);
-  const totalTax = lines.reduce((acc, li) => acc.plus(new Decimal(li.lineTax)), new Decimal(0)).toFixed(2);
+  const rawNet = lines.reduce((acc, li) => acc.plus(new Decimal(li.lineNet)), new Decimal(0));
+  const rawTax = lines.reduce((acc, li) => acc.plus(new Decimal(li.lineTax)), new Decimal(0));
+
+  const subtotalNet = rawNet.mul(discountFactor).toDecimalPlaces(2, 4).toFixed(2);
+  const totalTax = rawTax.mul(discountFactor).toDecimalPlaces(2, 4).toFixed(2);
   const totalGross = new Decimal(subtotalNet).plus(new Decimal(totalTax)).toFixed(2);
 
   await db

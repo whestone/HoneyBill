@@ -196,6 +196,7 @@ export interface Document {
   templateId: number | null;
   einvoiceProfile: EInvoiceProfile;
   leitwegId: string | null;
+  globalDiscountPct: string;
   layoutOverride: Partial<DocumentLayoutSettings> | null;
   internalNotes: string | null;
   createdBy: number | null;
