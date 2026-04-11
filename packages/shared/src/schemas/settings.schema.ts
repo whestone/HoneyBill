@@ -41,6 +41,32 @@ export const UpdatePdfSettingsSchema = z.object({
   logoHeight: z.number().int().min(20).max(100).default(40),
 });
 
+export const UpdateEmailSettingsSchema = z.object({
+  provider: z.enum(["smtp", "outlook"]).default("smtp"),
+  smtp: z.object({
+    host: z.string().min(1).max(200),
+    port: z.number().int().min(1).max(65535).default(587),
+    secure: z.boolean().default(false),
+    user: z.string().max(200),
+    password: z.string().max(500),
+    fromName: z.string().max(200),
+    fromAddress: z.string().email(),
+  }).nullable().default(null),
+  defaultSubject: z.string().max(500).default("{{dokumentTyp}} {{dokumentNummer}} von {{firmenName}}"),
+  defaultBody: z.string().max(5000).default(
+    "Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie {{dokumentTyp}} {{dokumentNummer}} über {{betrag}}.\n\n{{zahlungshinweis}}\n\nMit freundlichen Grüßen\n{{firmenName}}"
+  ),
+});
+
+export const SendDocumentEmailSchema = z.object({
+  to: z.string().email(),
+  subject: z.string().min(1).max(500),
+  body: z.string().min(1).max(10000),
+  attachPdf: z.boolean().default(true),
+});
+
 export type UpdateCompanySettingsInput = z.infer<typeof UpdateCompanySettingsSchema>;
 export type UpdateNumberSeriesInput = z.infer<typeof UpdateNumberSeriesSchema>;
 export type UpdatePdfSettingsInput = z.infer<typeof UpdatePdfSettingsSchema>;
+export type UpdateEmailSettingsInput = z.infer<typeof UpdateEmailSettingsSchema>;
+export type SendDocumentEmailInput = z.infer<typeof SendDocumentEmailSchema>;

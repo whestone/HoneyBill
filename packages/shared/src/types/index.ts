@@ -235,6 +235,41 @@ export const DEFAULT_PDF_SETTINGS: PdfSettings = {
   logoHeight: 40,
 };
 
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  password: string;
+  fromName: string;
+  fromAddress: string;
+}
+
+export interface EmailSettings {
+  provider: "smtp" | "outlook";
+  smtp: SmtpConfig | null;
+  defaultSubject: string;
+  defaultBody: string;
+}
+
+export const DEFAULT_EMAIL_SETTINGS: EmailSettings = {
+  provider: "smtp",
+  smtp: null,
+  defaultSubject: "{{dokumentTyp}} {{dokumentNummer}} von {{firmenName}}",
+  defaultBody:
+    "Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie {{dokumentTyp}} {{dokumentNummer}} über {{betrag}}.\n\n{{zahlungshinweis}}\n\nMit freundlichen Grüßen\n{{firmenName}}",
+};
+
+export const EMAIL_PLACEHOLDERS: { key: string; label: string }[] = [
+  { key: "{{dokumentNummer}}", label: "Belegnummer" },
+  { key: "{{dokumentTyp}}", label: "Belegtyp (z. B. Rechnung)" },
+  { key: "{{kundenName}}", label: "Kundenname" },
+  { key: "{{betrag}}", label: "Gesamtbetrag" },
+  { key: "{{faelligkeitsDatum}}", label: "Fälligkeitsdatum" },
+  { key: "{{firmenName}}", label: "Firmenname" },
+  { key: "{{zahlungshinweis}}", label: "Zahlungshinweis (auto)" },
+];
+
 export interface CompanySettings {
   id: number;
   name: string;
@@ -255,6 +290,7 @@ export interface CompanySettings {
   defaultCurrency: string;
   defaultPaymentDays: number;
   pdfSettings: PdfSettings | null;
+  emailSettings: EmailSettings | null;
   createdAt: string;
   updatedAt: string;
 }
