@@ -196,6 +196,7 @@ export interface Document {
   templateId: number | null;
   einvoiceProfile: EInvoiceProfile;
   leitwegId: string | null;
+  layoutOverride: Partial<DocumentLayoutSettings> | null;
   internalNotes: string | null;
   createdBy: number | null;
   finalizedBy: number | null;
@@ -223,53 +224,92 @@ export interface PdfSettings {
   layouts: Record<DocumentType, DocumentLayoutSettings>;
 }
 
+export type TotalDisplayMode = "gross" | "net" | "both";
+
 export interface DocumentLayoutSettings {
-  showPrices: boolean;
-  showTax: boolean;
-  showDiscount: boolean;
+  // Column visibility
+  colPositionNr: boolean;
+  colDate: boolean;
+  colQuantity: boolean;
+  colUnit: boolean;
+  colPrice: boolean;
+  colDiscount: boolean;
+  colTax: boolean;
+  colTaxAmount: boolean;
+  colNetAmount: boolean;
+  colGrossAmount: boolean;
+  // Sections
   showTotals: boolean;
   showPaymentInfo: boolean;
-  showPositionNumbers: boolean;
+  totalDisplay: TotalDisplayMode;
   closingText: string;
 }
 
 const LAYOUT_INVOICE: DocumentLayoutSettings = {
-  showPrices: true,
-  showTax: true,
-  showDiscount: true,
+  colPositionNr: true,
+  colDate: false,
+  colQuantity: true,
+  colUnit: true,
+  colPrice: true,
+  colDiscount: true,
+  colTax: true,
+  colTaxAmount: false,
+  colNetAmount: true,
+  colGrossAmount: false,
   showTotals: true,
   showPaymentInfo: true,
-  showPositionNumbers: true,
+  totalDisplay: "both",
   closingText: "Vielen Dank für Ihren Auftrag.",
 };
 
 const LAYOUT_QUOTE: DocumentLayoutSettings = {
-  showPrices: true,
-  showTax: true,
-  showDiscount: true,
+  colPositionNr: true,
+  colDate: false,
+  colQuantity: true,
+  colUnit: true,
+  colPrice: true,
+  colDiscount: true,
+  colTax: true,
+  colTaxAmount: false,
+  colNetAmount: true,
+  colGrossAmount: false,
   showTotals: true,
   showPaymentInfo: false,
-  showPositionNumbers: true,
+  totalDisplay: "gross",
   closingText: "Dieses Angebot ist 30 Tage gültig.",
 };
 
 const LAYOUT_DELIVERY_NOTE: DocumentLayoutSettings = {
-  showPrices: false,
-  showTax: false,
-  showDiscount: false,
+  colPositionNr: true,
+  colDate: false,
+  colQuantity: true,
+  colUnit: true,
+  colPrice: false,
+  colDiscount: false,
+  colTax: false,
+  colTaxAmount: false,
+  colNetAmount: false,
+  colGrossAmount: false,
   showTotals: false,
   showPaymentInfo: false,
-  showPositionNumbers: true,
+  totalDisplay: "gross",
   closingText: "Bitte prüfen Sie die Lieferung auf Vollständigkeit.",
 };
 
 const LAYOUT_CREDIT_NOTE: DocumentLayoutSettings = {
-  showPrices: true,
-  showTax: true,
-  showDiscount: true,
+  colPositionNr: true,
+  colDate: false,
+  colQuantity: true,
+  colUnit: true,
+  colPrice: true,
+  colDiscount: true,
+  colTax: true,
+  colTaxAmount: false,
+  colNetAmount: true,
+  colGrossAmount: false,
   showTotals: true,
   showPaymentInfo: true,
-  showPositionNumbers: true,
+  totalDisplay: "both",
   closingText: "Der Betrag wird Ihnen gutgeschrieben.",
 };
 
