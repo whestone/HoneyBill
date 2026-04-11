@@ -209,6 +209,68 @@ export interface Document {
   payments?: Payment[];
 }
 
+export interface PdfSettings {
+  accentColor: string;
+  headerBgColor: string;
+  altRowColor: string;
+  bodyFontSize: number;
+  titleFontSize: number;
+  paddingH: number;
+  paddingTop: number;
+  paddingBottom: number;
+  logoWidth: number;
+  logoHeight: number;
+}
+
+export const DEFAULT_PDF_SETTINGS: PdfSettings = {
+  accentColor: "#b45309",
+  headerBgColor: "#fef3c7",
+  altRowColor: "#fffbeb",
+  bodyFontSize: 9,
+  titleFontSize: 18,
+  paddingH: 50,
+  paddingTop: 40,
+  paddingBottom: 60,
+  logoWidth: 100,
+  logoHeight: 40,
+};
+
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  password: string;
+  fromName: string;
+  fromAddress: string;
+}
+
+export interface EmailSettings {
+  provider: "smtp" | "outlook";
+  smtp: SmtpConfig | null;
+  defaultSubject: string;
+  defaultBody: string;
+}
+
+export const DEFAULT_EMAIL_SETTINGS: EmailSettings = {
+  provider: "smtp",
+  smtp: null,
+  defaultSubject: "{{dokumentTyp}} {{dokumentNummer}} von {{firmenName}}",
+  defaultBody:
+    "Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie {{dokumentTyp}} {{dokumentNummer}} über {{betrag}}.\n\n{{zahlungshinweis}}\n\nMit freundlichen Grüßen\n{{firmenName}}",
+};
+
+export const EMAIL_PLACEHOLDERS: { key: string; label: string; example: string }[] = [
+  { key: "{{anrede}}", label: "Anrede", example: "Sehr geehrter Herr Mustermann," },
+  { key: "{{kundenName}}", label: "Kundenname", example: "Max Mustermann" },
+  { key: "{{dokumentNummer}}", label: "Belegnummer", example: "RE-2026-00001" },
+  { key: "{{dokumentTyp}}", label: "Belegtyp", example: "Rechnung" },
+  { key: "{{betrag}}", label: "Gesamtbetrag", example: "1.190,00 €" },
+  { key: "{{faelligkeitsDatum}}", label: "Fälligkeitsdatum", example: "25.04.2026" },
+  { key: "{{firmenName}}", label: "Firmenname", example: "Meine Firma GmbH" },
+  { key: "{{zahlungshinweis}}", label: "Zahlungshinweis (auto)", example: "Bitte überweisen Sie den Betrag bis zum…" },
+];
+
 export interface CompanySettings {
   id: number;
   name: string;
@@ -228,6 +290,8 @@ export interface CompanySettings {
   logoPath: string | null;
   defaultCurrency: string;
   defaultPaymentDays: number;
+  pdfSettings: PdfSettings | null;
+  emailSettings: EmailSettings | null;
   createdAt: string;
   updatedAt: string;
 }

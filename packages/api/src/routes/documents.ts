@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import Decimal from "decimal.js";
 import { db } from "../db/index.js";
 import { documentFiles, documentLineItems, documentTaxLines, documents, payments } from "../db/schema.js";
@@ -280,6 +280,40 @@ export async function documentRoutes(app: FastifyInstance) {
     return reply.status(201).send(delivery);
   });
 
+  // GET /api/v1/documents/:id/related
+  app.get("/:id/related", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const numId = Number(id);
+
+    // Fetch the current doc to find its parents
+    const self = await db.query.documents.findFirst({ where: eq(documents.id, numId) });
+    if (!self) return reply.send([]);
+
+    const parentIds = [self.sourceDocumentId, self.cancelsDocumentId].filter((x): x is number => x != null);
+
+    // Build OR conditions: children, parents, siblings (share a parent with this doc)
+    const conditions = [
+      or(eq(documents.sourceDocumentId, numId), eq(documents.cancelsDocumentId, numId)),
+    ];
+    if (parentIds.length > 0) {
+      conditions.push(inArray(documents.id, parentIds));
+      conditions.push(or(
+        inArray(documents.sourceDocumentId, parentIds),
+        inArray(documents.cancelsDocumentId, parentIds),
+      ) as any);
+    }
+
+    const rows = await db.query.documents.findMany({
+      where: and(
+        sql`${documents.id} != ${numId}`,
+        or(...conditions),
+      ),
+      with: { customer: true },
+      orderBy: [desc(documents.createdAt)],
+    });
+    return reply.send(rows);
+  });
+
   // GET /api/v1/documents/:id/payments
   app.get("/:id/payments", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { id } = req.params as { id: string };
@@ -301,8 +335,29 @@ export async function documentRoutes(app: FastifyInstance) {
 
   // DELETE /api/v1/documents/:id/payments/:paymentId
   app.delete("/:id/payments/:paymentId", { onRequest: [app.authenticate] }, async (req, reply) => {
-    const { paymentId } = req.params as { id: string; paymentId: string };
+    const { id, paymentId } = req.params as { id: string; paymentId: string };
+    const doc = await db.query.documents.findFirst({ where: eq(documents.id, Number(id)) });
+    if (!doc) return reply.status(404).send({ message: "Beleg nicht gefunden" });
+
     await db.delete(payments).where(eq(payments.id, Number(paymentId)));
+
+    // Recalculate document status
+    const remaining = await db.query.payments.findMany({ where: eq(payments.documentId, Number(id)) });
+    const totalPaid = remaining.reduce(
+      (acc, p) => acc.plus(new Decimal(p.amount)),
+      new Decimal(0)
+    );
+    const totalGross = new Decimal(doc.totalGross);
+    let newStatus: string;
+    if (totalPaid.greaterThanOrEqualTo(totalGross)) {
+      newStatus = "PAID";
+    } else if (totalPaid.greaterThan(0)) {
+      newStatus = "PARTIAL";
+    } else {
+      newStatus = "SENT";
+    }
+    await db.update(documents).set({ status: newStatus, updatedAt: new Date().toISOString() }).where(eq(documents.id, Number(id)));
+
     return reply.status(204).send();
   });
 

@@ -10,15 +10,18 @@ import {
   useConvertToInvoice,
   useCreateCreditNote,
   useCreateDeliveryNote,
+  useRelatedDocuments,
 } from "@/api/hooks/useDocuments";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { StatusBadge, TypeBadge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { PdfPreview } from "@/components/pdf/PdfPreview";
-import { formatEur, DOCUMENT_TYPE_LABELS } from "@honeybill/shared";
-import type { CompanySettings, DocumentType } from "@honeybill/shared";
-import { ArrowLeft, CheckCircle, CreditCard, Edit2, FileText, Send, Truck, Trash2, XCircle } from "lucide-react";
+import { formatEur, DOCUMENT_TYPE_LABELS, DEFAULT_EMAIL_SETTINGS } from "@honeybill/shared";
+import type { CompanySettings, Document, DocumentType } from "@honeybill/shared";
+import { ArrowLeft, CheckCircle, CreditCard, Edit2, FileText, Send, Truck, Trash2, XCircle, Mail } from "lucide-react";
+import { pdf } from "@react-pdf/renderer";
+import { InvoicePDF } from "@/components/pdf/InvoiceTemplate";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreatePaymentSchema, type CreatePaymentInput } from "@honeybill/shared";
@@ -28,8 +31,10 @@ export function DocumentDetailPage() {
   const navigate = useNavigate();
   const [showPayment, setShowPayment] = useState(false);
   const [showPdf, setShowPdf] = useState(false);
+  const [showEmail, setShowEmail] = useState(false);
 
   const { data: doc, isLoading } = useDocument(Number(id));
+  const { data: relatedDocs = [] } = useRelatedDocuments(Number(id));
   const { data: company } = useQuery<CompanySettings>({
     queryKey: ["company-settings"],
     queryFn: () => api.get("/settings/company"),
@@ -48,7 +53,7 @@ export function DocumentDetailPage() {
     return <div className="p-6 text-gray-400">Laden…</div>;
   }
 
-  const customer = (doc.customerSnapshot ?? doc.customer) as any;
+  const customer = parseCustomer(doc);
   const customerName =
     customer?.companyName ||
     `${customer?.firstName ?? ""} ${customer?.lastName ?? ""}`.trim() ||
@@ -67,7 +72,17 @@ export function DocumentDetailPage() {
     (acc, p) => acc + parseFloat(p.amount),
     0
   );
-  const openAmount = parseFloat(doc.totalGross) - totalPaid;
+  const finalizedCreditNotes = relatedDocs.filter(
+    (d) => d.documentType === "CREDIT_NOTE" && ["FINAL", "SENT", "PAID"].includes(d.status)
+  );
+  const totalCredited = finalizedCreditNotes.reduce((acc, cn) => acc + parseFloat(cn.totalGross), 0);
+  const openAmount = parseFloat(doc.totalGross) - totalPaid - totalCredited;
+
+  // Derive effective display status — credit notes can settle an invoice without changing DB status
+  const effectiveStatus =
+    doc.documentType === "INVOICE" && ["PARTIAL", "SENT", "FINAL"].includes(doc.status) && openAmount <= 0
+      ? "PAID"
+      : doc.status;
 
   return (
     <div className="p-6 space-y-6">
@@ -83,7 +98,7 @@ export function DocumentDetailPage() {
                 {doc.documentNumber ?? "(Entwurf)"}
               </h1>
               <TypeBadge type={doc.documentType as DocumentType} />
-              <StatusBadge status={doc.status as any} />
+              <StatusBadge status={effectiveStatus as any} />
             </div>
             <p className="text-sm text-gray-500 mt-0.5">{customerName}</p>
           </div>
@@ -165,6 +180,11 @@ export function DocumentDetailPage() {
             <button onClick={() => setShowPdf(true)} className="btn-secondary">
               <FileText size={14} /> {doc.status === "DRAFT" ? "Vorschau" : "PDF / E-Rechnung"}
             </button>
+            {doc.status !== "DRAFT" && (
+              <button onClick={() => setShowEmail(true)} className="btn-secondary">
+                <Mail size={14} /> E-Mail senden
+              </button>
+            )}
             {canDelete && (
               <button
                 onClick={() => {
@@ -298,9 +318,68 @@ export function DocumentDetailPage() {
                         </td>
                       </tr>
                     ))}
+                  {finalizedCreditNotes.map((cn) => (
+                    <tr key={`cn-${cn.id}`} className="border-b border-gray-50 bg-red-50/40">
+                      <td className="table-cell">{cn.issueDate ?? cn.createdAt?.slice(0, 10) ?? "—"}</td>
+                      <td className="table-cell text-gray-500">
+                        <Link to="/documents/$id" params={{ id: String(cn.id) }} className="text-honey-600 hover:underline text-xs">
+                          Gutschrift {cn.documentNumber ?? `#${cn.id}`}
+                        </Link>
+                      </td>
+                      <td className="table-cell text-gray-400 text-xs">Gutschrift</td>
+                      <td className="table-cell text-right font-medium text-red-600">
+                        −{formatEur(cn.totalGross)}
+                      </td>
+                    </tr>
+                  ))}
                   </tbody>
                 </table>
               )}
+            </div>
+          )}
+          {/* Related documents */}
+          {relatedDocs.length > 0 && (
+            <div className="card overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100">
+                <h2 className="font-semibold text-sm text-gray-900">Verknüpfte Belege</h2>
+              </div>
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="table-header">Nummer</th>
+                    <th className="table-header">Typ</th>
+                    <th className="table-header">Status</th>
+                    <th className="table-header text-right">Betrag</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {relatedDocs.map((rel) => {
+                    const isCreditNote = rel.documentType === "CREDIT_NOTE";
+                    return (
+                      <tr key={rel.id} className="border-b border-gray-50 hover:bg-gray-50">
+                        <td className="table-cell">
+                          <Link
+                            to="/documents/$id"
+                            params={{ id: String(rel.id) }}
+                            className="text-honey-600 hover:underline font-mono text-xs"
+                          >
+                            {rel.documentNumber ?? "(Entwurf)"}
+                          </Link>
+                        </td>
+                        <td className="table-cell">
+                          <TypeBadge type={rel.documentType as DocumentType} />
+                        </td>
+                        <td className="table-cell">
+                          <StatusBadge status={rel.status as any} />
+                        </td>
+                        <td className={`table-cell text-right font-medium ${isCreditNote ? "text-red-600" : ""}`}>
+                          {isCreditNote ? "−" : ""}{formatEur(rel.totalGross)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -365,12 +444,172 @@ export function DocumentDetailPage() {
       {/* PDF Modal */}
       {showPdf && company && (
         <Modal open={showPdf} onClose={() => setShowPdf(false)} title="PDF / E-Rechnung" size="full">
-          <div className="h-[70vh]">
+          <div className="h-full">
             <PdfPreview doc={doc} company={company} />
           </div>
         </Modal>
       )}
+
+      {/* E-Mail Modal */}
+      {showEmail && company && (
+        <SendEmailModal
+          open={showEmail}
+          onClose={() => setShowEmail(false)}
+          doc={doc}
+          company={company}
+        />
+      )}
     </div>
+  );
+}
+
+// ─── Placeholder resolution ───────────────────────────────────────────────────
+
+function parseCustomer(doc: Document): any {
+  const raw = doc.customerSnapshot ?? (doc as any).customer;
+  if (typeof raw === "string") { try { return JSON.parse(raw); } catch { return null; } }
+  return raw ?? null;
+}
+
+function resolvePlaceholders(template: string, doc: Document, company: CompanySettings): string {
+  const customer = parseCustomer(doc);
+  const customerName =
+    customer?.companyName ||
+    `${customer?.firstName ?? ""} ${customer?.lastName ?? ""}`.trim() ||
+    "—";
+  const anrede = (() => {
+    const lastName = (customer?.lastName ?? "").trim();
+    if (!lastName) return "Sehr geehrte Damen und Herren,";
+    const sal = (customer?.salutation ?? "").toLowerCase();
+    const form = sal === "frau" ? "geehrte Frau" : sal === "herr" ? "geehrter Herr" : "geehrte/r";
+    return `Sehr ${form} ${lastName},`;
+  })();
+  const typeLabel =
+    DOCUMENT_TYPE_LABELS[doc.documentType as keyof typeof DOCUMENT_TYPE_LABELS] ?? doc.documentType;
+  const dueDate = doc.dueDate
+    ? new Date(doc.dueDate).toLocaleDateString("de-DE")
+    : "";
+  const zahlungshinweis =
+    doc.documentType === "INVOICE" && doc.dueDate
+      ? `Bitte überweisen Sie den Betrag bis zum ${dueDate} auf unser Konto${
+          company.bankIban ? ` (IBAN: ${company.bankIban})` : ""
+        }.`
+      : "";
+  return template
+    .replace(/\{\{anrede\}\}/g, anrede)
+    .replace(/\{\{dokumentNummer\}\}/g, doc.documentNumber ?? "")
+    .replace(/\{\{dokumentTyp\}\}/g, typeLabel)
+    .replace(/\{\{kundenName\}\}/g, customerName)
+    .replace(/\{\{betrag\}\}/g, formatEur(doc.totalGross))
+    .replace(/\{\{faelligkeitsDatum\}\}/g, dueDate)
+    .replace(/\{\{firmenName\}\}/g, company.name)
+    .replace(/\{\{zahlungshinweis\}\}/g, zahlungshinweis);
+}
+
+// ─── Send E-Mail Modal ────────────────────────────────────────────────────────
+
+function SendEmailModal({
+  open, onClose, doc, company,
+}: { open: boolean; onClose: () => void; doc: Document; company: CompanySettings }) {
+  const emailSettings = company.emailSettings ?? DEFAULT_EMAIL_SETTINGS;
+  const customer = parseCustomer(doc);
+  const customerDisplayName =
+    customer?.companyName ||
+    [customer?.firstName, customer?.lastName].filter(Boolean).join(" ") ||
+    null;
+
+  const [to, setTo] = useState(customer?.email ?? "");
+  const [subject, setSubject] = useState(() =>
+    resolvePlaceholders(emailSettings.defaultSubject, doc, company)
+  );
+  const [body, setBody] = useState(() =>
+    resolvePlaceholders(emailSettings.defaultBody, doc, company)
+  );
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message?: string } | null>(null);
+
+  const handleSend = async () => {
+    setSending(true);
+    setResult(null);
+    try {
+      if (emailSettings.provider === "outlook") {
+        const mailtoUrl = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.open(mailtoUrl, "_blank");
+        setResult({ ok: true });
+        return;
+      }
+      // SMTP: generate PDF blob and post as multipart
+      const pdfBlob = await pdf(<InvoicePDF doc={doc} company={company} />).toBlob();
+      const form = new FormData();
+      form.append("to", to);
+      form.append("subject", subject);
+      form.append("body", body);
+      form.append("attachPdf", "true");
+      form.append("file", pdfBlob, `${doc.documentNumber ?? "dokument"}.pdf`);
+      const token = JSON.parse(localStorage.getItem("honeybill-auth") ?? "{}").state?.token ?? "";
+      const res = await fetch("/api/v1/settings/company/email/send-document", {
+        method: "POST",
+        body: form,
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any).message ?? "Fehler beim Senden");
+      }
+      setResult({ ok: true });
+    } catch (e: any) {
+      setResult({ ok: false, message: e.message });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="E-Mail senden" size="xl">
+      <div className="space-y-4">
+          {emailSettings.provider === "outlook" && (
+            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+              Outlook-Modus: Es wird ein mailto-Link geöffnet. Das PDF bitte manuell anhängen.
+            </p>
+          )}
+          <div>
+            <label className="label">Empfänger</label>
+            {customerDisplayName && (
+              <p className="text-xs text-gray-500 mb-1">{customerDisplayName}</p>
+            )}
+            <input type="email" value={to} onChange={(e) => setTo(e.target.value)} className="input" />
+          </div>
+          <div>
+            <label className="label">Betreff</label>
+            <input value={subject} onChange={(e) => setSubject(e.target.value)} className="input" />
+          </div>
+          <div>
+            <label className="label">Text</label>
+            <textarea rows={10} value={body} onChange={(e) => setBody(e.target.value)} className="input w-full resize-y font-mono text-xs" />
+          </div>
+          {emailSettings.provider === "smtp" && (
+            <p className="text-xs text-gray-500">
+              Das PDF wird automatisch als Anhang beigefügt ({doc.documentNumber ?? "Entwurf"}.pdf).
+            </p>
+          )}
+          {result && (
+            <p className={`text-sm ${result.ok ? "text-green-600" : "text-red-600"}`}>
+              {result.ok
+                ? emailSettings.provider === "outlook"
+                  ? "E-Mail-Client geöffnet."
+                  : "E-Mail erfolgreich gesendet."
+                : `Fehler: ${result.message}`}
+            </p>
+          )}
+        <div className="flex justify-end gap-2 pt-1">
+          <button type="button" onClick={onClose} className="btn-secondary">Abbrechen</button>
+          <button type="button" onClick={handleSend} disabled={sending || !to} className="btn-primary">
+            <Send size={14} />
+            {sending ? "Wird gesendet…" : emailSettings.provider === "outlook" ? "Öffnen" : "Senden"}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

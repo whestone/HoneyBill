@@ -22,6 +22,8 @@ export const companySettings = sqliteTable("company_settings", {
   logoPath: text("logo_path"),
   defaultCurrency: text("default_currency").notNull().default("EUR"),
   defaultPaymentDays: int("default_payment_days").notNull().default(14),
+  pdfSettings: text("pdf_settings"),
+  emailSettings: text("email_settings"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
 });

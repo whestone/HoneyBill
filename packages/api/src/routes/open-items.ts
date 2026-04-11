@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import Decimal from "decimal.js";
 import { db } from "../db/index.js";
 import { documents, payments } from "../db/schema.js";
@@ -26,13 +26,30 @@ export async function openItemsRoutes(app: FastifyInstance) {
       offset,
     });
 
+    // Fetch all finalized credit notes for these invoices in one query
+    const invoiceIds = invoices.map((inv) => inv.id);
+    const creditNotes = invoiceIds.length > 0 ? await db.query.documents.findMany({
+      where: and(
+        eq(documents.documentType, "CREDIT_NOTE"),
+        inArray(documents.status, ["FINAL", "SENT", "PAID"]),
+        inArray(documents.cancelsDocumentId, invoiceIds)
+      ),
+    }) : [];
+    const creditNotesByInvoice = new Map<number, Decimal>();
+    for (const cn of creditNotes) {
+      if (cn.cancelsDocumentId == null) continue;
+      const prev = creditNotesByInvoice.get(cn.cancelsDocumentId) ?? new Decimal(0);
+      creditNotesByInvoice.set(cn.cancelsDocumentId, prev.plus(new Decimal(cn.totalGross)));
+    }
+
     const today = new Date().toISOString().slice(0, 10);
     const openItems = invoices.map((inv) => {
       const paid = (inv.payments ?? []).reduce(
         (acc, p) => acc.plus(new Decimal(p.amount)),
         new Decimal(0)
       );
-      const open = new Decimal(inv.totalGross).minus(paid);
+      const credited = creditNotesByInvoice.get(inv.id) ?? new Decimal(0);
+      const open = new Decimal(inv.totalGross).minus(paid).minus(credited);
       const overdue = inv.dueDate != null && inv.dueDate < today && open.greaterThan(0);
       return {
         ...inv,
@@ -45,7 +62,8 @@ export async function openItemsRoutes(app: FastifyInstance) {
       };
     });
 
-    const filtered = q.overdue === "true" ? openItems.filter((i) => i.isOverdue) : openItems;
+    const withOpen = openItems.filter((i) => new Decimal(i.openAmount).greaterThan(0));
+    const filtered = q.overdue === "true" ? withOpen.filter((i) => i.isOverdue) : withOpen;
 
     return reply.send({
       data: filtered,
@@ -64,6 +82,21 @@ export async function openItemsRoutes(app: FastifyInstance) {
       with: { payments: true },
     });
 
+    const allIds = invoices.map((i) => i.id);
+    const summaryCreditNotes = allIds.length > 0 ? await db.query.documents.findMany({
+      where: and(
+        eq(documents.documentType, "CREDIT_NOTE"),
+        inArray(documents.status, ["FINAL", "SENT", "PAID"]),
+        inArray(documents.cancelsDocumentId, allIds)
+      ),
+    }) : [];
+    const summaryCreditMap = new Map<number, Decimal>();
+    for (const cn of summaryCreditNotes) {
+      if (cn.cancelsDocumentId == null) continue;
+      const prev = summaryCreditMap.get(cn.cancelsDocumentId) ?? new Decimal(0);
+      summaryCreditMap.set(cn.cancelsDocumentId, prev.plus(new Decimal(cn.totalGross)));
+    }
+
     const today = new Date().toISOString().slice(0, 10);
     let totalOpen = new Decimal(0);
     let totalOverdue = new Decimal(0);
@@ -75,7 +108,8 @@ export async function openItemsRoutes(app: FastifyInstance) {
         (acc, p) => acc.plus(new Decimal(p.amount)),
         new Decimal(0)
       );
-      const open = new Decimal(inv.totalGross).minus(paid);
+      const credited = summaryCreditMap.get(inv.id) ?? new Decimal(0);
+      const open = new Decimal(inv.totalGross).minus(paid).minus(credited);
       if (open.greaterThan(0)) {
         count++;
         totalOpen = totalOpen.plus(open);
