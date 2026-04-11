@@ -17,7 +17,7 @@ import { api } from "@/api/client";
 import { StatusBadge, TypeBadge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { PdfPreview } from "@/components/pdf/PdfPreview";
-import { formatEur, DOCUMENT_TYPE_LABELS, DEFAULT_EMAIL_SETTINGS, EMAIL_PLACEHOLDERS } from "@honeybill/shared";
+import { formatEur, DOCUMENT_TYPE_LABELS, DEFAULT_EMAIL_SETTINGS } from "@honeybill/shared";
 import type { CompanySettings, Document, DocumentType } from "@honeybill/shared";
 import { ArrowLeft, CheckCircle, CreditCard, Edit2, FileText, Send, Truck, Trash2, XCircle, Mail } from "lucide-react";
 import { pdf } from "@react-pdf/renderer";
@@ -472,12 +472,11 @@ function resolvePlaceholders(template: string, doc: Document, company: CompanySe
     `${customer?.firstName ?? ""} ${customer?.lastName ?? ""}`.trim() ||
     "—";
   const anrede = (() => {
-    if (customer?.lastName) {
-      const sal = (customer?.salutation ?? "").toLowerCase();
-      const form = sal === "frau" ? "geehrte Frau" : sal === "herr" ? "geehrter Herr" : "geehrte/r";
-      return `Sehr ${form} ${customer.lastName},`;
-    }
-    return "Sehr geehrte Damen und Herren,";
+    const lastName = (customer?.lastName ?? "").trim();
+    if (!lastName) return "Sehr geehrte Damen und Herren,";
+    const sal = (customer?.salutation ?? "").toLowerCase();
+    const form = sal === "frau" ? "geehrte Frau" : sal === "herr" ? "geehrter Herr" : "geehrte/r";
+    return `Sehr ${form} ${lastName},`;
   })();
   const typeLabel =
     DOCUMENT_TYPE_LABELS[doc.documentType as keyof typeof DOCUMENT_TYPE_LABELS] ?? doc.documentType;
@@ -561,9 +560,7 @@ function SendEmailModal({
 
   return (
     <Modal open={open} onClose={onClose} title="E-Mail senden" size="xl">
-      <div className="flex gap-6">
-        {/* Left: form */}
-        <div className="flex-1 space-y-4">
+      <div className="space-y-4">
           {emailSettings.provider === "outlook" && (
             <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
               Outlook-Modus: Es wird ein mailto-Link geöffnet. Das PDF bitte manuell anhängen.
@@ -598,32 +595,12 @@ function SendEmailModal({
                 : `Fehler: ${result.message}`}
             </p>
           )}
-          <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="btn-secondary">Abbrechen</button>
-            <button type="button" onClick={handleSend} disabled={sending || !to} className="btn-primary">
-              <Send size={14} />
-              {sending ? "Wird gesendet…" : emailSettings.provider === "outlook" ? "Öffnen" : "Senden"}
-            </button>
-          </div>
-        </div>
-
-        {/* Right: placeholder list */}
-        <div className="w-56 shrink-0 border-l border-gray-100 pl-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Platzhalter</p>
-          <div className="space-y-2">
-            {EMAIL_PLACEHOLDERS.map((p) => (
-              <div key={p.key}>
-                <button
-                  type="button"
-                  onClick={() => setBody((b) => b + p.key)}
-                  className="font-mono text-xs text-honey-700 hover:underline block leading-tight"
-                >
-                  {p.key}
-                </button>
-                <span className="text-xs text-gray-400">{p.example}</span>
-              </div>
-            ))}
-          </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <button type="button" onClick={onClose} className="btn-secondary">Abbrechen</button>
+          <button type="button" onClick={handleSend} disabled={sending || !to} className="btn-primary">
+            <Send size={14} />
+            {sending ? "Wird gesendet…" : emailSettings.provider === "outlook" ? "Öffnen" : "Senden"}
+          </button>
         </div>
       </div>
     </Modal>
