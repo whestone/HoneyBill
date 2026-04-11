@@ -7,9 +7,9 @@ import {
   Text,
   View,
 } from "@react-pdf/renderer";
-import type { Document as HBDocument, CompanySettings } from "@honeybill/shared";
-import { DEFAULT_PDF_SETTINGS, DOCUMENT_TYPE_LABELS, formatEur } from "@honeybill/shared";
-import type { PdfSettings } from "@honeybill/shared";
+import type { Document as HBDocument, CompanySettings, DocumentLayoutSettings } from "@honeybill/shared";
+import { DEFAULT_PDF_SETTINGS, DEFAULT_LAYOUTS, DOCUMENT_TYPE_LABELS, formatEur } from "@honeybill/shared";
+import type { PdfSettings, DocumentType } from "@honeybill/shared";
 
 // Static structural styles (layout-only, no colors/sizes from settings)
 const base = StyleSheet.create({
@@ -37,14 +37,6 @@ const base = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 6,
   },
-  colPos:   { width: "6%"  },
-  colDesc:  { flex: 1      },
-  colQty:   { width: "9%", textAlign: "right" },
-  colUnit:  { width: "8%", textAlign: "center" },
-  colPrice: { width: "12%", textAlign: "right" },
-  colDisc:  { width: "8%", textAlign: "right" },
-  colTax:   { width: "8%", textAlign: "right" },
-  colNet:   { width: "12%", textAlign: "right" },
   totalsBlock: { alignSelf: "flex-end", width: 200, marginBottom: 20 },
   totalsRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 3 },
   totalsLabel: { color: "#555" },
@@ -75,7 +67,7 @@ const base = StyleSheet.create({
   paymentRow: { flexDirection: "row", gap: 20, fontSize: 8 },
   paymentItem: { flexDirection: "row", gap: 4 },
   paymentLabel: { color: "#555" },
-  notesBlock: { marginTop: 12, fontSize: 8, color: "#555", lineHeight: 1.6 },
+  closingText: { marginTop: 16, fontSize: 9, color: "#555", lineHeight: 1.6 },
 });
 
 interface InvoicePDFProps {
@@ -84,11 +76,14 @@ interface InvoicePDFProps {
 }
 
 export function InvoicePDF({ doc, company }: InvoicePDFProps) {
-  const s: PdfSettings = { ...DEFAULT_PDF_SETTINGS, ...(company.pdfSettings ?? {}) };
+  const s: PdfSettings = { ...DEFAULT_PDF_SETTINGS, ...(company.pdfSettings ?? {}), layouts: { ...DEFAULT_LAYOUTS, ...(company.pdfSettings?.layouts ?? {}) } };
+  const layout: DocumentLayoutSettings = s.layouts[doc.documentType as DocumentType] ?? DEFAULT_LAYOUTS.INVOICE;
 
-  const customer = doc.customerSnapshot
-    ? (doc.customerSnapshot as any)
-    : doc.customer;
+  const customer = (() => {
+    const raw = doc.customerSnapshot ?? (doc as any).customer;
+    if (typeof raw === "string") { try { return JSON.parse(raw); } catch { return null; } }
+    return raw ?? null;
+  })();
 
   const customerName =
     customer?.companyName ||
@@ -96,6 +91,9 @@ export function InvoicePDF({ doc, company }: InvoicePDFProps) {
     "Unbekannter Kunde";
 
   const logoUrl = company.logoPath ? `/uploads/${company.logoPath}` : null;
+
+  // Dynamic column definitions based on layout
+  const cols = buildColumns(layout);
 
   return (
     <Document>
@@ -138,8 +136,8 @@ export function InvoicePDF({ doc, company }: InvoicePDFProps) {
         <View style={base.docMeta}>
           {doc.documentNumber && <Text>Nr. {doc.documentNumber}</Text>}
           {doc.issueDate && <Text>Datum: {formatDate(doc.issueDate)}</Text>}
-          {doc.dueDate && <Text>Fällig: {formatDate(doc.dueDate)}</Text>}
-          {doc.deliveryDate && <Text>Leistungsdatum: {formatDate(doc.deliveryDate)}</Text>}
+          {doc.dueDate && layout.showPaymentInfo && <Text>Fällig: {formatDate(doc.dueDate)}</Text>}
+          {doc.deliveryDate && <Text>Leistungsdatum: {formatDate(doc.deliveryDate)}{doc.deliveryDateEnd ? ` – ${formatDate(doc.deliveryDateEnd)}` : ""}</Text>}
         </View>
 
         {/* Addresses */}
@@ -173,39 +171,37 @@ export function InvoicePDF({ doc, company }: InvoicePDFProps) {
         {/* Line items table */}
         <View style={base.table}>
           <View style={[base.tableHeader, { backgroundColor: s.headerBgColor }]}>
-            <Text style={base.colPos}>#</Text>
-            <Text style={base.colDesc}>Beschreibung</Text>
-            <Text style={base.colQty}>Menge</Text>
-            <Text style={base.colUnit}>Einh.</Text>
-            <Text style={base.colPrice}>Einzelpr.</Text>
-            <Text style={base.colDisc}>Rabatt</Text>
-            <Text style={base.colTax}>MwSt.</Text>
-            <Text style={base.colNet}>Netto</Text>
+            {cols.map((c) => (
+              <Text key={c.key} style={c.style}>{c.header}</Text>
+            ))}
           </View>
           {(doc.lineItems ?? []).map((li, idx) => {
             const rowStyle = idx % 2 === 1 ? { backgroundColor: s.altRowColor } : {};
             if (li.lineType === "TEXT") {
               return (
                 <View key={li.id} style={[base.tableRow, rowStyle]}>
-                  <Text style={[base.colDesc, { color: "#666", fontStyle: "italic", paddingLeft: 18 }]}>
+                  <Text style={{ flex: 1, color: "#666", fontStyle: "italic", paddingLeft: layout.showPositionNumbers ? 18 : 0 }}>
                     {li.description}
                   </Text>
                 </View>
               );
             }
             if (li.lineType === "ITEM") {
+              const values: Record<string, string> = {
+                pos: String(li.position + 1),
+                desc: li.description,
+                qty: li.quantity,
+                unit: li.unit,
+                price: formatEur(li.unitPrice),
+                discount: li.discountPct !== "0.00" ? `${li.discountPct}%` : "—",
+                tax: `${li.taxRatePct}%`,
+                net: formatEur(li.lineNet),
+              };
               return (
                 <View key={li.id} style={[base.tableRow, rowStyle]}>
-                  <Text style={base.colPos}>{li.position + 1}</Text>
-                  <Text style={base.colDesc}>{li.description}</Text>
-                  <Text style={base.colQty}>{li.quantity}</Text>
-                  <Text style={base.colUnit}>{li.unit}</Text>
-                  <Text style={base.colPrice}>{formatEur(li.unitPrice)}</Text>
-                  <Text style={base.colDisc}>
-                    {li.discountPct !== "0.00" ? `${li.discountPct}%` : "—"}
-                  </Text>
-                  <Text style={base.colTax}>{li.taxRatePct}%</Text>
-                  <Text style={base.colNet}>{formatEur(li.lineNet)}</Text>
+                  {cols.map((c) => (
+                    <Text key={c.key} style={c.style}>{values[c.key] ?? ""}</Text>
+                  ))}
                 </View>
               );
             }
@@ -214,27 +210,29 @@ export function InvoicePDF({ doc, company }: InvoicePDFProps) {
         </View>
 
         {/* Totals */}
-        <View style={base.totalsBlock}>
-          <View style={base.totalsRow}>
-            <Text style={base.totalsLabel}>Nettobetrag</Text>
-            <Text style={base.totalsValue}>{formatEur(doc.subtotalNet)}</Text>
-          </View>
-          {(doc.taxLines ?? []).map((tl) => (
-            <View key={tl.id} style={base.totalsRow}>
-              <Text style={base.totalsLabel}>MwSt. {tl.taxRatePct}%</Text>
-              <Text style={base.totalsValue}>{formatEur(tl.taxAmount)}</Text>
+        {layout.showTotals && (
+          <View style={base.totalsBlock}>
+            <View style={base.totalsRow}>
+              <Text style={base.totalsLabel}>Nettobetrag</Text>
+              <Text style={base.totalsValue}>{formatEur(doc.subtotalNet)}</Text>
             </View>
-          ))}
-          <View style={[base.totalGrossRow, { borderTopColor: s.accentColor }]}>
-            <Text style={[base.totalGrossLabel, { fontSize: s.bodyFontSize + 2 }]}>Gesamtbetrag</Text>
-            <Text style={[base.totalGrossValue, { fontSize: s.bodyFontSize + 2, color: s.accentColor }]}>
-              {formatEur(doc.totalGross)}
-            </Text>
+            {layout.showTax && (doc.taxLines ?? []).map((tl) => (
+              <View key={tl.id} style={base.totalsRow}>
+                <Text style={base.totalsLabel}>MwSt. {tl.taxRatePct}%</Text>
+                <Text style={base.totalsValue}>{formatEur(tl.taxAmount)}</Text>
+              </View>
+            ))}
+            <View style={[base.totalGrossRow, { borderTopColor: s.accentColor }]}>
+              <Text style={[base.totalGrossLabel, { fontSize: s.bodyFontSize + 2 }]}>Gesamtbetrag</Text>
+              <Text style={[base.totalGrossValue, { fontSize: s.bodyFontSize + 2, color: s.accentColor }]}>
+                {formatEur(doc.totalGross)}
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Payment info */}
-        {(company.bankIban || company.bankBic || doc.paymentTermsText || doc.dueDate || doc.paymentDays) && (
+        {layout.showPaymentInfo && (company.bankIban || company.bankBic || doc.paymentTermsText || doc.dueDate || doc.paymentDays) && (
           <View style={base.paymentBlock}>
             <Text style={base.paymentTitle}>Zahlungsinformationen</Text>
             <View style={base.paymentRow}>
@@ -270,6 +268,11 @@ export function InvoicePDF({ doc, company }: InvoicePDFProps) {
           </View>
         )}
 
+        {/* Closing text */}
+        {layout.closingText && (
+          <Text style={base.closingText}>{layout.closingText}</Text>
+        )}
+
         {/* Footer */}
         <View
           style={[
@@ -285,6 +288,41 @@ export function InvoicePDF({ doc, company }: InvoicePDFProps) {
       </Page>
     </Document>
   );
+}
+
+// ─── Column builder ──────────────────────────────────────────────────────────
+
+interface Column {
+  key: string;
+  header: string;
+  style: Record<string, any>;
+}
+
+function buildColumns(layout: DocumentLayoutSettings): Column[] {
+  const cols: Column[] = [];
+
+  if (layout.showPositionNumbers) {
+    cols.push({ key: "pos", header: "#", style: { width: "6%" } });
+  }
+
+  cols.push({ key: "desc", header: "Beschreibung", style: { flex: 1 } });
+  cols.push({ key: "qty", header: "Menge", style: { width: "9%", textAlign: "right" } });
+  cols.push({ key: "unit", header: "Einh.", style: { width: "8%", textAlign: "center" } });
+
+  if (layout.showPrices) {
+    cols.push({ key: "price", header: "Einzelpr.", style: { width: "12%", textAlign: "right" } });
+  }
+  if (layout.showDiscount) {
+    cols.push({ key: "discount", header: "Rabatt", style: { width: "8%", textAlign: "right" } });
+  }
+  if (layout.showTax) {
+    cols.push({ key: "tax", header: "MwSt.", style: { width: "8%", textAlign: "right" } });
+  }
+  if (layout.showPrices) {
+    cols.push({ key: "net", header: "Netto", style: { width: "12%", textAlign: "right" } });
+  }
+
+  return cols;
 }
 
 function formatDate(iso: string): string {

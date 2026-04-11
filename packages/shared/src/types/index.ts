@@ -220,7 +220,65 @@ export interface PdfSettings {
   paddingBottom: number;
   logoWidth: number;
   logoHeight: number;
+  layouts: Record<DocumentType, DocumentLayoutSettings>;
 }
+
+export interface DocumentLayoutSettings {
+  showPrices: boolean;
+  showTax: boolean;
+  showDiscount: boolean;
+  showTotals: boolean;
+  showPaymentInfo: boolean;
+  showPositionNumbers: boolean;
+  closingText: string;
+}
+
+const LAYOUT_INVOICE: DocumentLayoutSettings = {
+  showPrices: true,
+  showTax: true,
+  showDiscount: true,
+  showTotals: true,
+  showPaymentInfo: true,
+  showPositionNumbers: true,
+  closingText: "Vielen Dank für Ihren Auftrag.",
+};
+
+const LAYOUT_QUOTE: DocumentLayoutSettings = {
+  showPrices: true,
+  showTax: true,
+  showDiscount: true,
+  showTotals: true,
+  showPaymentInfo: false,
+  showPositionNumbers: true,
+  closingText: "Dieses Angebot ist 30 Tage gültig.",
+};
+
+const LAYOUT_DELIVERY_NOTE: DocumentLayoutSettings = {
+  showPrices: false,
+  showTax: false,
+  showDiscount: false,
+  showTotals: false,
+  showPaymentInfo: false,
+  showPositionNumbers: true,
+  closingText: "Bitte prüfen Sie die Lieferung auf Vollständigkeit.",
+};
+
+const LAYOUT_CREDIT_NOTE: DocumentLayoutSettings = {
+  showPrices: true,
+  showTax: true,
+  showDiscount: true,
+  showTotals: true,
+  showPaymentInfo: true,
+  showPositionNumbers: true,
+  closingText: "Der Betrag wird Ihnen gutgeschrieben.",
+};
+
+export const DEFAULT_LAYOUTS: Record<DocumentType, DocumentLayoutSettings> = {
+  INVOICE: LAYOUT_INVOICE,
+  QUOTE: LAYOUT_QUOTE,
+  DELIVERY_NOTE: LAYOUT_DELIVERY_NOTE,
+  CREDIT_NOTE: LAYOUT_CREDIT_NOTE,
+};
 
 export const DEFAULT_PDF_SETTINGS: PdfSettings = {
   accentColor: "#b45309",
@@ -233,6 +291,7 @@ export const DEFAULT_PDF_SETTINGS: PdfSettings = {
   paddingBottom: 60,
   logoWidth: 100,
   logoHeight: 40,
+  layouts: DEFAULT_LAYOUTS,
 };
 
 export interface SmtpConfig {
