@@ -533,9 +533,18 @@ function SendEmailModal({
     setResult(null);
     try {
       if (emailSettings.provider === "outlook") {
+        // Generate and download PDF first so user can attach it
+        const pdfBlob = await pdf(<InvoicePDF doc={doc} company={company} />).toBlob();
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        const a = document.createElement("a");
+        a.href = pdfUrl;
+        a.download = `${doc.documentNumber ?? "dokument"}.pdf`;
+        a.click();
+        URL.revokeObjectURL(pdfUrl);
+        // Then open mailto link
         const mailtoUrl = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         window.open(mailtoUrl, "_blank");
-        setResult({ ok: true });
+        setResult({ ok: true, message: "PDF wurde heruntergeladen — bitte als Anhang hinzufügen." });
         return;
       }
       // SMTP: generate PDF blob and post as multipart
@@ -569,7 +578,7 @@ function SendEmailModal({
       <div className="space-y-4">
           {emailSettings.provider === "outlook" && (
             <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-              Outlook-Modus: Es wird ein mailto-Link geöffnet. Das PDF bitte manuell anhängen.
+              Outlook-Modus: Das PDF wird heruntergeladen und der E-Mail-Client geöffnet. Bitte die PDF als Anhang hinzufügen.
             </p>
           )}
           <div>
@@ -595,9 +604,7 @@ function SendEmailModal({
           {result && (
             <p className={`text-sm ${result.ok ? "text-green-600" : "text-red-600"}`}>
               {result.ok
-                ? emailSettings.provider === "outlook"
-                  ? "E-Mail-Client geöffnet."
-                  : "E-Mail erfolgreich gesendet."
+                ? result.message ?? "E-Mail erfolgreich gesendet."
                 : `Fehler: ${result.message}`}
             </p>
           )}
