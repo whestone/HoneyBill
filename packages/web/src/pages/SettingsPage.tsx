@@ -668,7 +668,7 @@ function EmailTab() {
       </div>
 
       <div className="flex items-center gap-3">
-        <button type="button" onClick={() => saveEmail.mutate(settings)} disabled={saveEmail.isPending} className="btn-primary">
+        <button type="button" onClick={() => saveEmail.mutate({ ...settings, smtp: settings.provider === "outlook" ? null : settings.smtp })} disabled={saveEmail.isPending} className="btn-primary">
           {saveEmail.isPending ? "Speichern…" : "Speichern"}
         </button>
         {saved && <span className="flex items-center gap-1 text-green-600 text-sm"><CheckCircle size={14} /> Gespeichert</span>}
