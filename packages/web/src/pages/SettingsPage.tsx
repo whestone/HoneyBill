@@ -1,12 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
-import type { CompanySettings, TaxRate, PdfSettings } from "@honeybill/shared";
-import { DEFAULT_PDF_SETTINGS, UpdatePdfSettingsSchema, type UpdatePdfSettingsInput } from "@honeybill/shared";
+import type { CompanySettings, TaxRate, PdfSettings, EmailSettings } from "@honeybill/shared";
+import {
+  DEFAULT_PDF_SETTINGS, UpdatePdfSettingsSchema, type UpdatePdfSettingsInput,
+  DEFAULT_EMAIL_SETTINGS, UpdateEmailSettingsSchema, type UpdateEmailSettingsInput,
+  EMAIL_PLACEHOLDERS,
+} from "@honeybill/shared";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { UpdateCompanySettingsSchema, type UpdateCompanySettingsInput } from "@honeybill/shared";
 import { useEffect, useRef, useState, useMemo } from "react";
-import { Building2, CheckCircle, Percent, Plus, Trash2, FileText } from "lucide-react";
+import { Building2, CheckCircle, Percent, Plus, Trash2, FileText, Mail, Send, Eye, EyeOff } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { usePDF } from "@react-pdf/renderer";
 import { InvoicePDF } from "@/components/pdf/InvoiceTemplate";
@@ -14,14 +18,14 @@ import type { Document as HBDocument } from "@honeybill/shared";
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-const TAB_LABELS = { company: "Firmendaten", taxrates: "Steuersätze", pdflayout: "PDF-Layout" } as const;
+const TAB_LABELS = { company: "Firmendaten", taxrates: "Steuersätze", pdflayout: "PDF-Layout", email: "E-Mail" } as const;
 type Tab = keyof typeof TAB_LABELS;
 
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>("company");
 
   return (
-    <div className={`p-6 space-y-4 ${tab === "pdflayout" ? "max-w-6xl" : "max-w-3xl"}`}>
+    <div className={`p-6 space-y-4 ${tab === "pdflayout" ? "max-w-6xl" : "max-w-3xl"}`} style={{ minWidth: 0 }}>
       <h1 className="text-2xl font-bold text-gray-900">Einstellungen</h1>
 
       {/* Tab bar */}
@@ -44,6 +48,7 @@ export function SettingsPage() {
       {tab === "company" && <CompanyTab />}
       {tab === "taxrates" && <TaxRatesTab />}
       {tab === "pdflayout" && <PdfLayoutTab />}
+      {tab === "email" && <EmailTab />}
     </div>
   );
 }
@@ -441,6 +446,234 @@ function NumberRow({ label, unit, min, max, value, onChange }: {
         onChange={(e) => onChange(Number(e.target.value))}
         className="input"
       />
+    </div>
+  );
+}
+
+// ─── E-Mail Tab ───────────────────────────────────────────────────────────────
+
+function EmailTab() {
+  const qc = useQueryClient();
+  const [saved, setSaved] = useState(false);
+  const [testEmail, setTestEmail] = useState("");
+  const [testResult, setTestResult] = useState<{ ok: boolean; message?: string } | null>(null);
+  const [testLoading, setTestLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const { data: company, isLoading } = useQuery<CompanySettings>({
+    queryKey: ["company-settings"],
+    queryFn: () => api.get("/settings/company"),
+  });
+
+  const [settings, setSettings] = useState<UpdateEmailSettingsInput>(() => ({
+    ...DEFAULT_EMAIL_SETTINGS,
+    smtp: DEFAULT_EMAIL_SETTINGS.smtp ?? null,
+  }));
+
+  useEffect(() => {
+    if (company?.emailSettings) {
+      setSettings({ ...DEFAULT_EMAIL_SETTINGS, ...company.emailSettings });
+    } else if (company?.email) {
+      setSettings((s) => ({
+        ...s,
+        smtp: s.smtp ? s.smtp : { host: "", port: 587, secure: false, user: "", password: "", fromName: company.name ?? "", fromAddress: company.email ?? "" },
+      }));
+    }
+  }, [company]);
+
+  const saveEmail = useMutation({
+    mutationFn: (data: UpdateEmailSettingsInput) => api.put("/settings/company/email", data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["company-settings"] });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    },
+  });
+
+  const handleTest = async () => {
+    if (!testEmail) return;
+    setTestLoading(true);
+    setTestResult(null);
+    try {
+      await api.post("/settings/company/email/test", { to: testEmail });
+      setTestResult({ ok: true });
+    } catch (e: any) {
+      setTestResult({ ok: false, message: e.message });
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  const setSmtp = <K extends keyof NonNullable<UpdateEmailSettingsInput["smtp"]>>(
+    key: K,
+    val: NonNullable<UpdateEmailSettingsInput["smtp"]>[K]
+  ) => setSettings((s) => ({ ...s, smtp: { ...(s.smtp ?? { host: "", port: 587, secure: false, user: "", password: "", fromName: "", fromAddress: "" }), [key]: val } }));
+
+  const insertPlaceholder = (field: "subject" | "body", placeholder: string) => {
+    setSettings((s) => ({
+      ...s,
+      [field === "subject" ? "defaultSubject" : "defaultBody"]:
+        (field === "subject" ? s.defaultSubject : s.defaultBody) + placeholder,
+    }));
+  };
+
+  if (isLoading) return <div className="py-8 text-center text-gray-400">Laden…</div>;
+
+  return (
+    <div className="space-y-4">
+      {/* Provider selection */}
+      <div className="card p-5 space-y-4">
+        <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+          <Mail size={16} /> Versandmethode
+        </h2>
+        <div className="flex gap-4">
+          {(["smtp", "outlook"] as const).map((p) => (
+            <label key={p} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="provider"
+                value={p}
+                checked={settings.provider === p}
+                onChange={() => setSettings((s) => ({ ...s, provider: p }))}
+              />
+              <span className="text-sm font-medium">
+                {p === "smtp" ? "SMTP (eigener Mailserver)" : "Outlook / Standard-E-Mail-Client"}
+              </span>
+            </label>
+          ))}
+        </div>
+        {settings.provider === "outlook" && (
+          <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+            Im Outlook-Modus wird beim Versand ein <code>mailto:</code>-Link geöffnet.
+            Das PDF muss manuell als Anhang hinzugefügt werden.
+          </p>
+        )}
+      </div>
+
+      {/* SMTP config */}
+      {settings.provider === "smtp" && (
+        <div className="card p-5 space-y-4">
+          <h2 className="font-semibold text-gray-900">SMTP-Konfiguration</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2 grid grid-cols-[1fr_120px_auto] gap-3 items-end">
+              <div>
+                <label className="label">Postausgangsserver (Host)</label>
+                <input value={settings.smtp?.host ?? ""} onChange={(e) => setSmtp("host", e.target.value)} className="input" placeholder="smtp.gmail.com" />
+              </div>
+              <div>
+                <label className="label">Port</label>
+                <input type="number" value={settings.smtp?.port ?? 587} onChange={(e) => setSmtp("port", Number(e.target.value))} className="input" />
+              </div>
+              <label className="flex items-center gap-2 text-sm pb-2 cursor-pointer">
+                <input type="checkbox" checked={settings.smtp?.secure ?? false} onChange={(e) => setSmtp("secure", e.target.checked)} />
+                SSL/TLS
+              </label>
+            </div>
+            <div>
+              <label className="label">Benutzername / E-Mail</label>
+              <input value={settings.smtp?.user ?? ""} onChange={(e) => setSmtp("user", e.target.value)} className="input" autoComplete="username" />
+            </div>
+            <div>
+              <label className="label">Passwort</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={settings.smtp?.password ?? ""}
+                  onChange={(e) => setSmtp("password", e.target.value)}
+                  className="input pr-9"
+                  autoComplete="current-password"
+                />
+                <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="label">Absendername</label>
+              <input value={settings.smtp?.fromName ?? ""} onChange={(e) => setSmtp("fromName", e.target.value)} className="input" placeholder="Meine Firma GmbH" />
+            </div>
+            <div>
+              <label className="label">Absender-E-Mail</label>
+              <input type="email" value={settings.smtp?.fromAddress ?? ""} onChange={(e) => setSmtp("fromAddress", e.target.value)} className="input" />
+            </div>
+          </div>
+
+          {/* Test */}
+          <div className="flex items-center gap-3 pt-1 border-t border-gray-100">
+            <input
+              type="email"
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+              placeholder="Testempfänger eingeben…"
+              className="input max-w-xs"
+            />
+            <button
+              type="button"
+              onClick={handleTest}
+              disabled={testLoading || !testEmail}
+              className="btn-secondary text-sm"
+            >
+              <Send size={14} /> {testLoading ? "Sende…" : "Test-E-Mail"}
+            </button>
+            {testResult && (
+              <span className={`text-sm flex items-center gap-1 ${testResult.ok ? "text-green-600" : "text-red-600"}`}>
+                {testResult.ok ? <><CheckCircle size={14} /> Erfolgreich gesendet</> : <>Fehler: {testResult.message}</>}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* E-Mail-Vorlagen */}
+      <div className="card p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-gray-900">Vorlagen</h2>
+          <div className="flex flex-wrap gap-1">
+            {EMAIL_PLACEHOLDERS.map((p) => (
+              <span key={p.key} className="text-xs text-gray-500 border border-gray-200 rounded px-1.5 py-0.5 font-mono">{p.key}</span>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label className="label">Standard-Betreff</label>
+          <div className="flex gap-2">
+            <input
+              value={settings.defaultSubject}
+              onChange={(e) => setSettings((s) => ({ ...s, defaultSubject: e.target.value }))}
+              className="input flex-1"
+            />
+          </div>
+          <div className="flex gap-1 mt-1 flex-wrap">
+            {EMAIL_PLACEHOLDERS.map((p) => (
+              <button key={p.key} type="button" onClick={() => insertPlaceholder("subject", p.key)}
+                className="text-xs text-honey-700 hover:underline">{p.label}</button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label className="label">Standard-E-Mail-Text</label>
+          <textarea
+            rows={8}
+            value={settings.defaultBody}
+            onChange={(e) => setSettings((s) => ({ ...s, defaultBody: e.target.value }))}
+            className="input font-mono text-xs w-full resize-y"
+          />
+          <div className="flex gap-1 mt-1 flex-wrap">
+            {EMAIL_PLACEHOLDERS.map((p) => (
+              <button key={p.key} type="button" onClick={() => insertPlaceholder("body", p.key)}
+                className="text-xs text-honey-700 hover:underline">{p.label}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={() => saveEmail.mutate(settings)} disabled={saveEmail.isPending} className="btn-primary">
+          {saveEmail.isPending ? "Speichern…" : "Speichern"}
+        </button>
+        {saved && <span className="flex items-center gap-1 text-green-600 text-sm"><CheckCircle size={14} /> Gespeichert</span>}
+        {saveEmail.isError && <span className="text-red-600 text-sm">{(saveEmail.error as Error)?.message}</span>}
+      </div>
     </div>
   );
 }

@@ -17,9 +17,11 @@ import { api } from "@/api/client";
 import { StatusBadge, TypeBadge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { PdfPreview } from "@/components/pdf/PdfPreview";
-import { formatEur, DOCUMENT_TYPE_LABELS } from "@honeybill/shared";
+import { formatEur, DOCUMENT_TYPE_LABELS, DEFAULT_EMAIL_SETTINGS, EMAIL_PLACEHOLDERS } from "@honeybill/shared";
 import type { CompanySettings, Document, DocumentType } from "@honeybill/shared";
-import { ArrowLeft, CheckCircle, CreditCard, Edit2, FileText, Send, Truck, Trash2, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle, CreditCard, Edit2, FileText, Send, Truck, Trash2, XCircle, Mail } from "lucide-react";
+import { pdf } from "@react-pdf/renderer";
+import { InvoicePDF } from "@/components/pdf/InvoiceTemplate";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreatePaymentSchema, type CreatePaymentInput } from "@honeybill/shared";
@@ -29,6 +31,7 @@ export function DocumentDetailPage() {
   const navigate = useNavigate();
   const [showPayment, setShowPayment] = useState(false);
   const [showPdf, setShowPdf] = useState(false);
+  const [showEmail, setShowEmail] = useState(false);
 
   const { data: doc, isLoading } = useDocument(Number(id));
   const { data: relatedDocs = [] } = useRelatedDocuments(Number(id));
@@ -177,6 +180,11 @@ export function DocumentDetailPage() {
             <button onClick={() => setShowPdf(true)} className="btn-secondary">
               <FileText size={14} /> {doc.status === "DRAFT" ? "Vorschau" : "PDF / E-Rechnung"}
             </button>
+            {doc.status !== "DRAFT" && (
+              <button onClick={() => setShowEmail(true)} className="btn-secondary">
+                <Mail size={14} /> E-Mail senden
+              </button>
+            )}
             {canDelete && (
               <button
                 onClick={() => {
@@ -441,7 +449,162 @@ export function DocumentDetailPage() {
           </div>
         </Modal>
       )}
+
+      {/* E-Mail Modal */}
+      {showEmail && company && (
+        <SendEmailModal
+          open={showEmail}
+          onClose={() => setShowEmail(false)}
+          doc={doc}
+          company={company}
+        />
+      )}
     </div>
+  );
+}
+
+// ─── Placeholder resolution ───────────────────────────────────────────────────
+
+function resolvePlaceholders(template: string, doc: Document, company: CompanySettings): string {
+  const customer = (doc.customerSnapshot ?? (doc as any).customer) as any;
+  const customerName =
+    customer?.companyName ||
+    `${customer?.firstName ?? ""} ${customer?.lastName ?? ""}`.trim() ||
+    "—";
+  const typeLabel =
+    DOCUMENT_TYPE_LABELS[doc.documentType as keyof typeof DOCUMENT_TYPE_LABELS] ?? doc.documentType;
+  const dueDate = doc.dueDate
+    ? new Date(doc.dueDate).toLocaleDateString("de-DE")
+    : "";
+  const zahlungshinweis =
+    doc.documentType === "INVOICE" && doc.dueDate
+      ? `Bitte überweisen Sie den Betrag bis zum ${dueDate} auf unser Konto${
+          company.bankIban ? ` (IBAN: ${company.bankIban})` : ""
+        }.`
+      : "";
+  return template
+    .replace(/\{\{dokumentNummer\}\}/g, doc.documentNumber ?? "")
+    .replace(/\{\{dokumentTyp\}\}/g, typeLabel)
+    .replace(/\{\{kundenName\}\}/g, customerName)
+    .replace(/\{\{betrag\}\}/g, formatEur(doc.totalGross))
+    .replace(/\{\{faelligkeitsDatum\}\}/g, dueDate)
+    .replace(/\{\{firmenName\}\}/g, company.name)
+    .replace(/\{\{zahlungshinweis\}\}/g, zahlungshinweis);
+}
+
+// ─── Send E-Mail Modal ────────────────────────────────────────────────────────
+
+function SendEmailModal({
+  open, onClose, doc, company,
+}: { open: boolean; onClose: () => void; doc: Document; company: CompanySettings }) {
+  const emailSettings = company.emailSettings ?? DEFAULT_EMAIL_SETTINGS;
+  const customer = (doc.customerSnapshot ?? (doc as any).customer) as any;
+
+  const [to, setTo] = useState(customer?.email ?? "");
+  const [subject, setSubject] = useState(() =>
+    resolvePlaceholders(emailSettings.defaultSubject, doc, company)
+  );
+  const [body, setBody] = useState(() =>
+    resolvePlaceholders(emailSettings.defaultBody, doc, company)
+  );
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message?: string } | null>(null);
+
+  const handleSend = async () => {
+    setSending(true);
+    setResult(null);
+    try {
+      if (emailSettings.provider === "outlook") {
+        const mailtoUrl = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.open(mailtoUrl, "_blank");
+        setResult({ ok: true });
+        return;
+      }
+      // SMTP: generate PDF blob and post as multipart
+      const pdfBlob = await pdf(<InvoicePDF doc={doc} company={company} />).toBlob();
+      const form = new FormData();
+      form.append("to", to);
+      form.append("subject", subject);
+      form.append("body", body);
+      form.append("attachPdf", "true");
+      form.append("file", pdfBlob, `${doc.documentNumber ?? "dokument"}.pdf`);
+      const token = JSON.parse(localStorage.getItem("honeybill-auth") ?? "{}").state?.token ?? "";
+      const res = await fetch("/api/v1/settings/company/email/send-document", {
+        method: "POST",
+        body: form,
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any).message ?? "Fehler beim Senden");
+      }
+      setResult({ ok: true });
+    } catch (e: any) {
+      setResult({ ok: false, message: e.message });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const insertIntoBody = (placeholder: string) =>
+    setBody((b) => b + placeholder);
+
+  return (
+    <Modal open={open} onClose={onClose} title="E-Mail senden" size="xl">
+      <div className="space-y-4">
+        {emailSettings.provider === "outlook" && (
+          <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+            Outlook-Modus: Es wird ein mailto-Link geöffnet. Das PDF bitte manuell anhängen.
+          </p>
+        )}
+        <div>
+          <label className="label">Empfänger</label>
+          <input type="email" value={to} onChange={(e) => setTo(e.target.value)} className="input" />
+        </div>
+        <div>
+          <label className="label">Betreff</label>
+          <input value={subject} onChange={(e) => setSubject(e.target.value)} className="input" />
+        </div>
+        <div>
+          <label className="label">
+            Text
+            <span className="ml-2 font-normal text-gray-400 text-xs">
+              {EMAIL_PLACEHOLDERS.map((p) => (
+                <button key={p.key} type="button" onClick={() => insertIntoBody(p.key)}
+                  className="text-honey-700 hover:underline mr-2">{p.label}</button>
+              ))}
+            </span>
+          </label>
+          <textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} className="input w-full resize-y font-mono text-xs" />
+        </div>
+        {emailSettings.provider === "smtp" && (
+          <p className="text-xs text-gray-500">
+            Das PDF wird automatisch als Anhang beigefügt ({doc.documentNumber ?? "Entwurf"}.pdf).
+          </p>
+        )}
+        {result && (
+          <p className={`text-sm ${result.ok ? "text-green-600" : "text-red-600"}`}>
+            {result.ok
+              ? emailSettings.provider === "outlook"
+                ? "E-Mail-Client geöffnet."
+                : "E-Mail erfolgreich gesendet."
+              : `Fehler: ${result.message}`}
+          </p>
+        )}
+        <div className="flex justify-end gap-2 pt-1">
+          <button type="button" onClick={onClose} className="btn-secondary">Abbrechen</button>
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={sending || !to}
+            className="btn-primary"
+          >
+            <Send size={14} />
+            {sending ? "Wird gesendet…" : emailSettings.provider === "outlook" ? "Öffnen" : "Senden"}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
