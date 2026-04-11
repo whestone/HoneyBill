@@ -436,7 +436,7 @@ export function DocumentDetailPage() {
       {/* PDF Modal */}
       {showPdf && company && (
         <Modal open={showPdf} onClose={() => setShowPdf(false)} title="PDF / E-Rechnung" size="full">
-          <div className="h-[70vh]">
+          <div className="h-full">
             <PdfPreview doc={doc} company={company} />
           </div>
         </Modal>
