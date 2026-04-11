@@ -76,7 +76,13 @@ interface InvoicePDFProps {
 }
 
 export function InvoicePDF({ doc, company }: InvoicePDFProps) {
-  const s: PdfSettings = { ...DEFAULT_PDF_SETTINGS, ...(company.pdfSettings ?? {}), layouts: { ...DEFAULT_LAYOUTS, ...(company.pdfSettings?.layouts ?? {}) } };
+  const savedLayouts = (company.pdfSettings?.layouts ?? {}) as Partial<Record<DocumentType, Partial<DocumentLayoutSettings>>>;
+  const mergedLayouts = Object.fromEntries(
+    (["INVOICE", "QUOTE", "DELIVERY_NOTE", "CREDIT_NOTE"] as DocumentType[]).map(
+      (dt) => [dt, { ...DEFAULT_LAYOUTS[dt], ...(savedLayouts[dt] ?? {}) }]
+    )
+  ) as Record<DocumentType, DocumentLayoutSettings>;
+  const s: PdfSettings = { ...DEFAULT_PDF_SETTINGS, ...(company.pdfSettings ?? {}), layouts: mergedLayouts };
   const layout: DocumentLayoutSettings = s.layouts[doc.documentType as DocumentType] ?? DEFAULT_LAYOUTS.INVOICE;
 
   const customer = (() => {
