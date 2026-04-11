@@ -28,6 +28,16 @@ export const UpdateNumberSeriesSchema = z.object({
   resetYearly: z.boolean().default(true),
 });
 
+const DocumentLayoutSettingsSchema = z.object({
+  showPrices: z.boolean().default(true),
+  showTax: z.boolean().default(true),
+  showDiscount: z.boolean().default(true),
+  showTotals: z.boolean().default(true),
+  showPaymentInfo: z.boolean().default(true),
+  showPositionNumbers: z.boolean().default(true),
+  closingText: z.string().max(2000).default(""),
+});
+
 export const UpdatePdfSettingsSchema = z.object({
   accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#b45309"),
   headerBgColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#fef3c7"),
@@ -39,6 +49,7 @@ export const UpdatePdfSettingsSchema = z.object({
   paddingBottom: z.number().int().min(30).max(100).default(60),
   logoWidth: z.number().int().min(40).max(200).default(100),
   logoHeight: z.number().int().min(20).max(100).default(40),
+  layouts: z.record(z.enum(["INVOICE", "QUOTE", "DELIVERY_NOTE", "CREDIT_NOTE"]), DocumentLayoutSettingsSchema).optional(),
 });
 
 export const UpdateEmailSettingsSchema = z.object({
