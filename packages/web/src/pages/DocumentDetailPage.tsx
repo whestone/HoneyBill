@@ -471,6 +471,14 @@ function resolvePlaceholders(template: string, doc: Document, company: CompanySe
     customer?.companyName ||
     `${customer?.firstName ?? ""} ${customer?.lastName ?? ""}`.trim() ||
     "—";
+  const anrede = (() => {
+    if (customer?.lastName) {
+      const sal = (customer?.salutation ?? "").toLowerCase();
+      const form = sal === "frau" ? "geehrte Frau" : sal === "herr" ? "geehrter Herr" : "geehrte/r";
+      return `Sehr ${form} ${customer.lastName},`;
+    }
+    return "Sehr geehrte Damen und Herren,";
+  })();
   const typeLabel =
     DOCUMENT_TYPE_LABELS[doc.documentType as keyof typeof DOCUMENT_TYPE_LABELS] ?? doc.documentType;
   const dueDate = doc.dueDate
@@ -483,6 +491,7 @@ function resolvePlaceholders(template: string, doc: Document, company: CompanySe
         }.`
       : "";
   return template
+    .replace(/\{\{anrede\}\}/g, anrede)
     .replace(/\{\{dokumentNummer\}\}/g, doc.documentNumber ?? "")
     .replace(/\{\{dokumentTyp\}\}/g, typeLabel)
     .replace(/\{\{kundenName\}\}/g, customerName)
@@ -499,6 +508,10 @@ function SendEmailModal({
 }: { open: boolean; onClose: () => void; doc: Document; company: CompanySettings }) {
   const emailSettings = company.emailSettings ?? DEFAULT_EMAIL_SETTINGS;
   const customer = (doc.customerSnapshot ?? (doc as any).customer) as any;
+  const customerDisplayName =
+    customer?.companyName ||
+    [customer?.firstName, customer?.lastName].filter(Boolean).join(" ") ||
+    null;
 
   const [to, setTo] = useState(customer?.email ?? "");
   const [subject, setSubject] = useState(() =>
@@ -546,62 +559,71 @@ function SendEmailModal({
     }
   };
 
-  const insertIntoBody = (placeholder: string) =>
-    setBody((b) => b + placeholder);
-
   return (
     <Modal open={open} onClose={onClose} title="E-Mail senden" size="xl">
-      <div className="space-y-4">
-        {emailSettings.provider === "outlook" && (
-          <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-            Outlook-Modus: Es wird ein mailto-Link geöffnet. Das PDF bitte manuell anhängen.
-          </p>
-        )}
-        <div>
-          <label className="label">Empfänger</label>
-          <input type="email" value={to} onChange={(e) => setTo(e.target.value)} className="input" />
+      <div className="flex gap-6">
+        {/* Left: form */}
+        <div className="flex-1 space-y-4">
+          {emailSettings.provider === "outlook" && (
+            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+              Outlook-Modus: Es wird ein mailto-Link geöffnet. Das PDF bitte manuell anhängen.
+            </p>
+          )}
+          <div>
+            <label className="label">Empfänger</label>
+            {customerDisplayName && (
+              <p className="text-xs text-gray-500 mb-1">{customerDisplayName}</p>
+            )}
+            <input type="email" value={to} onChange={(e) => setTo(e.target.value)} className="input" />
+          </div>
+          <div>
+            <label className="label">Betreff</label>
+            <input value={subject} onChange={(e) => setSubject(e.target.value)} className="input" />
+          </div>
+          <div>
+            <label className="label">Text</label>
+            <textarea rows={10} value={body} onChange={(e) => setBody(e.target.value)} className="input w-full resize-y font-mono text-xs" />
+          </div>
+          {emailSettings.provider === "smtp" && (
+            <p className="text-xs text-gray-500">
+              Das PDF wird automatisch als Anhang beigefügt ({doc.documentNumber ?? "Entwurf"}.pdf).
+            </p>
+          )}
+          {result && (
+            <p className={`text-sm ${result.ok ? "text-green-600" : "text-red-600"}`}>
+              {result.ok
+                ? emailSettings.provider === "outlook"
+                  ? "E-Mail-Client geöffnet."
+                  : "E-Mail erfolgreich gesendet."
+                : `Fehler: ${result.message}`}
+            </p>
+          )}
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className="btn-secondary">Abbrechen</button>
+            <button type="button" onClick={handleSend} disabled={sending || !to} className="btn-primary">
+              <Send size={14} />
+              {sending ? "Wird gesendet…" : emailSettings.provider === "outlook" ? "Öffnen" : "Senden"}
+            </button>
+          </div>
         </div>
-        <div>
-          <label className="label">Betreff</label>
-          <input value={subject} onChange={(e) => setSubject(e.target.value)} className="input" />
-        </div>
-        <div>
-          <label className="label">
-            Text
-            <span className="ml-2 font-normal text-gray-400 text-xs">
-              {EMAIL_PLACEHOLDERS.map((p) => (
-                <button key={p.key} type="button" onClick={() => insertIntoBody(p.key)}
-                  className="text-honey-700 hover:underline mr-2">{p.label}</button>
-              ))}
-            </span>
-          </label>
-          <textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} className="input w-full resize-y font-mono text-xs" />
-        </div>
-        {emailSettings.provider === "smtp" && (
-          <p className="text-xs text-gray-500">
-            Das PDF wird automatisch als Anhang beigefügt ({doc.documentNumber ?? "Entwurf"}.pdf).
-          </p>
-        )}
-        {result && (
-          <p className={`text-sm ${result.ok ? "text-green-600" : "text-red-600"}`}>
-            {result.ok
-              ? emailSettings.provider === "outlook"
-                ? "E-Mail-Client geöffnet."
-                : "E-Mail erfolgreich gesendet."
-              : `Fehler: ${result.message}`}
-          </p>
-        )}
-        <div className="flex justify-end gap-2 pt-1">
-          <button type="button" onClick={onClose} className="btn-secondary">Abbrechen</button>
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={sending || !to}
-            className="btn-primary"
-          >
-            <Send size={14} />
-            {sending ? "Wird gesendet…" : emailSettings.provider === "outlook" ? "Öffnen" : "Senden"}
-          </button>
+
+        {/* Right: placeholder list */}
+        <div className="w-56 shrink-0 border-l border-gray-100 pl-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Platzhalter</p>
+          <div className="space-y-2">
+            {EMAIL_PLACEHOLDERS.map((p) => (
+              <div key={p.key}>
+                <button
+                  type="button"
+                  onClick={() => setBody((b) => b + p.key)}
+                  className="font-mono text-xs text-honey-700 hover:underline block leading-tight"
+                >
+                  {p.key}
+                </button>
+                <span className="text-xs text-gray-400">{p.example}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </Modal>
