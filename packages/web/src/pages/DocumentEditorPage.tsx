@@ -11,6 +11,7 @@ import type {
   Customer,
   Product,
   PaginatedResponse,
+  DocumentLayoutSettings,
 } from "@honeybill/shared";
 import {
   computeLineGross,
@@ -18,9 +19,10 @@ import {
   computeLineTax,
   formatEur,
   DOCUMENT_TYPE_LABELS,
+  DEFAULT_LAYOUTS,
   Decimal,
 } from "@honeybill/shared";
-import { ArrowLeft, AlertCircle, CheckCircle, Plus, Save, Trash2, GripVertical, Search, FileText } from "lucide-react";
+import { ArrowLeft, AlertCircle, CheckCircle, Plus, Save, Trash2, GripVertical, Search, FileText, Settings2 } from "lucide-react";
 import { TypeBadge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { PdfPreview } from "@/components/pdf/PdfPreview";
@@ -108,6 +110,9 @@ export function DocumentEditorPage() {
   const [paymentDays, setPaymentDays] = useState<string>("");
   const [internalNotes, setInternalNotes] = useState("");
   const [einvoiceProfile, setEinvoiceProfile] = useState<string>("");
+  const [globalDiscountPct, setGlobalDiscountPct] = useState("0.00");
+  const [layoutOverride, setLayoutOverride] = useState<Partial<DocumentLayoutSettings> | null>(null);
+  const [showLayoutSettings, setShowLayoutSettings] = useState(false);
 
   // Load doc into state once
   useEffect(() => {
@@ -117,12 +122,28 @@ export function DocumentEditorPage() {
     setPaymentDays(doc.paymentDays != null ? String(doc.paymentDays) : "");
     setInternalNotes(doc.internalNotes ?? "");
     setEinvoiceProfile(doc.einvoiceProfile ?? "");
+    setGlobalDiscountPct(doc.globalDiscountPct ?? "0.00");
+    const lo = (() => {
+      const raw = (doc as any).layoutOverride;
+      if (!raw) return null;
+      if (typeof raw === "string") { try { return JSON.parse(raw); } catch { return null; } }
+      return raw;
+    })();
+    setLayoutOverride(lo);
   }, [doc?.id]); // only on doc id change, not every render
 
   // Totals
-  const subtotalNet = rows
-    .reduce((acc, r) => acc.plus(new Decimal(r.lineNet)), new Decimal(0))
-    .toFixed(2);
+  const rawSubtotalNet = rows
+    .reduce((acc, r) => acc.plus(new Decimal(r.lineNet)), new Decimal(0));
+  const rawTotalTax = rows
+    .reduce((acc, r) => acc.plus(new Decimal(r.lineTax)), new Decimal(0));
+
+  const gDiscount = new Decimal(globalDiscountPct || "0");
+  const discountFactor = new Decimal(1).minus(gDiscount.div(100));
+  const globalDiscountNet = rawSubtotalNet.minus(rawSubtotalNet.mul(discountFactor).toDecimalPlaces(2, Decimal.ROUND_HALF_UP));
+  const hasGlobalDiscount = gDiscount.greaterThan(0);
+
+  const subtotalNet = rawSubtotalNet.mul(discountFactor).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toFixed(2);
 
   const taxGroups: Record<string, { net: Decimal; tax: Decimal; label: string }> = {};
   for (const r of rows) {
@@ -135,7 +156,7 @@ export function DocumentEditorPage() {
   }
 
   const totalTax = Object.values(taxGroups)
-    .reduce((acc, g) => acc.plus(g.tax), new Decimal(0))
+    .reduce((acc, g) => acc.plus(g.tax.mul(discountFactor).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)), new Decimal(0))
     .toFixed(2);
   const totalGross = new Decimal(subtotalNet).plus(new Decimal(totalTax)).toFixed(2);
 
@@ -200,6 +221,8 @@ export function DocumentEditorPage() {
         paymentDays: paymentDays ? Number(paymentDays) : null,
         internalNotes: internalNotes || null,
         einvoiceProfile: einvoiceProfile || null,
+        globalDiscountPct: globalDiscountPct || "0.00",
+        layoutOverride: layoutOverride || null,
         lineItems: rows.map((r, i) => ({
           position: i,
           lineType: r.lineType,
@@ -217,7 +240,7 @@ export function DocumentEditorPage() {
     } finally {
       setSaving(false);
     }
-  }, [doc, rows, deliveryDate, paymentDays, internalNotes, einvoiceProfile, qc]);
+  }, [doc, rows, deliveryDate, paymentDays, internalNotes, einvoiceProfile, globalDiscountPct, layoutOverride, qc]);
 
   const handleFinalize = async () => {
     setFinalizeError(null);
@@ -431,9 +454,21 @@ export function DocumentEditorPage() {
         </div>
 
         {/* Totals sidebar */}
-        <div className="w-60 shrink-0 p-4 space-y-4 border-l border-gray-200 bg-white overflow-y-auto">
+        <div className="w-64 shrink-0 p-4 space-y-4 border-l border-gray-200 bg-white overflow-y-auto">
           <h3 className="text-sm font-semibold text-gray-900">Summen</h3>
           <div className="space-y-2 text-sm">
+            {hasGlobalDiscount && (
+              <div className="flex justify-between text-gray-400">
+                <span>Zwischensumme</span>
+                <span>{formatEur(rawSubtotalNet.toFixed(2))}</span>
+              </div>
+            )}
+            {hasGlobalDiscount && (
+              <div className="flex justify-between text-red-600">
+                <span>Gesamtrabatt {globalDiscountPct}%</span>
+                <span>-{formatEur(globalDiscountNet.toFixed(2))}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-gray-500">Netto gesamt</span>
               <span className="font-medium">{formatEur(subtotalNet)}</span>
@@ -441,7 +476,7 @@ export function DocumentEditorPage() {
             {Object.entries(taxGroups).map(([pct, g]) => (
               <div key={pct} className="flex justify-between text-gray-500">
                 <span>MwSt. {pct}</span>
-                <span>{formatEur(g.tax.toFixed(2))}</span>
+                <span>{formatEur(g.tax.mul(discountFactor).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toFixed(2))}</span>
               </div>
             ))}
             <div className="flex justify-between font-bold text-base pt-2 border-t border-honey-200">
@@ -449,6 +484,29 @@ export function DocumentEditorPage() {
               <span className="text-honey-700">{formatEur(totalGross)}</span>
             </div>
           </div>
+
+          {/* Global discount */}
+          <div>
+            <label className="label">Gesamtrabatt %</label>
+            <input
+              type="number"
+              className="input text-sm"
+              min={0}
+              max={100}
+              step={0.01}
+              value={globalDiscountPct}
+              onChange={(e) => { setGlobalDiscountPct(e.target.value); setDirty(true); }}
+              placeholder="0.00"
+            />
+          </div>
+
+          {/* Layout override button */}
+          <button
+            onClick={() => setShowLayoutSettings(true)}
+            className="btn-secondary w-full justify-center text-xs"
+          >
+            <Settings2 size={13} /> PDF-Layout anpassen
+          </button>
 
           <div className="pt-2 space-y-2">
             <button onClick={save} disabled={saving} className="btn-secondary w-full justify-center text-sm">
@@ -460,6 +518,17 @@ export function DocumentEditorPage() {
           </div>
         </div>
       </div>
+
+      {/* Layout Override Modal */}
+      {showLayoutSettings && (
+        <LayoutOverrideModal
+          docType={doc.documentType as DocumentType}
+          override={layoutOverride}
+          companyLayouts={company?.pdfSettings?.layouts ?? null}
+          onSave={(lo) => { setLayoutOverride(lo); setDirty(true); setShowLayoutSettings(false); }}
+          onClose={() => setShowLayoutSettings(false)}
+        />
+      )}
 
       {/* PDF Preview Modal */}
       {showPdf && company && (
@@ -622,6 +691,176 @@ function LineItemRow({ row, idx, taxRates, onChange, onRemove, onProductSelect }
         />
       )}
     </div>
+  );
+}
+
+// ─── Layout Override Modal ──────────────────────────────────────────────────
+
+const COLUMN_TOGGLES: { key: keyof DocumentLayoutSettings; label: string }[] = [
+  { key: "colPositionNr", label: "Pos.-Nr." },
+  { key: "colDate", label: "Datum" },
+  { key: "colQuantity", label: "Menge" },
+  { key: "colUnit", label: "Einheit" },
+  { key: "colPrice", label: "Einzelpreis" },
+  { key: "colDiscount", label: "Rabatt" },
+  { key: "colTax", label: "USt. %" },
+  { key: "colTaxAmount", label: "USt. Betrag" },
+  { key: "colNetAmount", label: "Nettobetrag" },
+  { key: "colGrossAmount", label: "Bruttobetrag" },
+];
+
+const SECTION_TOGGLES: { key: keyof DocumentLayoutSettings; label: string }[] = [
+  { key: "showTotals", label: "Summenblock" },
+  { key: "showPaymentInfo", label: "Zahlungsinfo" },
+];
+
+function LayoutOverrideModal({
+  docType,
+  override,
+  companyLayouts,
+  onSave,
+  onClose,
+}: {
+  docType: DocumentType;
+  override: Partial<DocumentLayoutSettings> | null;
+  companyLayouts: Record<string, Partial<DocumentLayoutSettings>> | null;
+  onSave: (lo: Partial<DocumentLayoutSettings> | null) => void;
+  onClose: () => void;
+}) {
+  const globalLayout = {
+    ...DEFAULT_LAYOUTS[docType],
+    ...(companyLayouts?.[docType] ?? {}),
+  } as DocumentLayoutSettings;
+
+  const [local, setLocal] = useState<Partial<DocumentLayoutSettings>>(override ?? {});
+
+  const merged = { ...globalLayout, ...local };
+
+  const toggle = (key: keyof DocumentLayoutSettings) => {
+    const current = merged[key];
+    setLocal((prev) => ({ ...prev, [key]: !current }));
+  };
+
+  const setTotalDisplay = (mode: "gross" | "net" | "both") => {
+    setLocal((prev) => ({ ...prev, totalDisplay: mode }));
+  };
+
+  const setClosingText = (text: string) => {
+    setLocal((prev) => ({ ...prev, closingText: text }));
+  };
+
+  const handleReset = () => {
+    setLocal({});
+  };
+
+  const handleSave = () => {
+    const cleaned = Object.fromEntries(
+      Object.entries(local).filter(([k, v]) => {
+        const gVal = (globalLayout as any)[k];
+        return v !== gVal;
+      })
+    ) as Partial<DocumentLayoutSettings>;
+    onSave(Object.keys(cleaned).length > 0 ? cleaned : null);
+  };
+
+  const hasOverrides = Object.keys(local).some((k) => {
+    return (local as any)[k] !== (globalLayout as any)[k];
+  });
+
+  return (
+    <Modal open onClose={onClose} title="PDF-Layout für diesen Beleg" size="lg">
+      <div className="space-y-5">
+        {hasOverrides && (
+          <div className="bg-honey-50 border border-honey-200 rounded-lg px-3 py-2 text-xs text-honey-700">
+            Dieses Dokument hat individuelle Layout-Einstellungen, die von den globalen abweichen.
+          </div>
+        )}
+
+        <div>
+          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Spalten</h4>
+          <div className="grid grid-cols-2 gap-2">
+            {COLUMN_TOGGLES.map(({ key, label }) => {
+              const isOverridden = key in local;
+              return (
+                <label
+                  key={key}
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded text-sm cursor-pointer hover:bg-gray-50 ${isOverridden ? "bg-honey-50 border border-honey-200" : ""}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={merged[key] as boolean}
+                    onChange={() => toggle(key)}
+                    className="accent-honey-600"
+                  />
+                  <span>{label}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Abschnitte</h4>
+          <div className="grid grid-cols-2 gap-2">
+            {SECTION_TOGGLES.map(({ key, label }) => {
+              const isOverridden = key in local;
+              return (
+                <label
+                  key={key}
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded text-sm cursor-pointer hover:bg-gray-50 ${isOverridden ? "bg-honey-50 border border-honey-200" : ""}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={merged[key] as boolean}
+                    onChange={() => toggle(key)}
+                    className="accent-honey-600"
+                  />
+                  <span>{label}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Summenanzeige</h4>
+          <div className="flex gap-3">
+            {(["gross", "net", "both"] as const).map((mode) => (
+              <label key={mode} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  name="totalDisplay"
+                  checked={merged.totalDisplay === mode}
+                  onChange={() => setTotalDisplay(mode)}
+                  className="accent-honey-600"
+                />
+                {mode === "gross" ? "Brutto" : mode === "net" ? "Netto" : "Beides"}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Schlusstext</h4>
+          <textarea
+            className="input text-sm"
+            rows={2}
+            value={merged.closingText}
+            onChange={(e) => setClosingText(e.target.value)}
+          />
+        </div>
+
+        <div className="flex justify-between pt-2 border-t border-gray-100">
+          <button onClick={handleReset} className="btn-secondary text-xs">
+            Auf global zurücksetzen
+          </button>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="btn-secondary text-sm">Abbrechen</button>
+            <button onClick={handleSave} className="btn-primary text-sm">Übernehmen</button>
+          </div>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

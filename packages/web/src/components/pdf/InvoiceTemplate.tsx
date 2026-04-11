@@ -256,20 +256,56 @@ function TotalsBlock({ doc, layout, s }: { doc: HBDocument; layout: DocumentLayo
 
   // Calculate discount if any line has discount
   const lines = doc.lineItems ?? [];
-  const hasDiscount = lines.some((li) => li.lineType === "ITEM" && li.discountPct !== "0.00");
-  const subtotalGross = (parseFloat(doc.subtotalNet) + parseFloat(doc.totalTax)).toFixed(2);
+  const hasLineDiscount = lines.some((li) => li.lineType === "ITEM" && li.discountPct !== "0.00");
+
+  // Global discount
+  const globalDiscountPct = parseFloat(doc.globalDiscountPct ?? "0.00");
+  const hasGlobalDiscount = globalDiscountPct > 0;
+  const discountFactor = 1 - globalDiscountPct / 100;
+
+  // Raw line totals (before global discount)
+  const rawNet = lines
+    .filter((li) => li.lineType === "ITEM")
+    .reduce((acc, li) => acc + parseFloat(li.lineNet), 0);
+  const rawTax = lines
+    .filter((li) => li.lineType === "ITEM")
+    .reduce((acc, li) => acc + parseFloat(li.lineTax), 0);
 
   return (
     <View style={base.totalsBlock}>
-      {showGross && hasDiscount && (
+      {showGross && hasLineDiscount && !hasGlobalDiscount && (
         <>
           <View style={base.totalsRow}>
             <Text style={base.totalsLabel}>Zwischensumme (brutto)</Text>
-            <Text style={base.totalsValue}>{formatEur(subtotalGross)}</Text>
+            <Text style={base.totalsValue}>{formatEur((parseFloat(doc.subtotalNet) + parseFloat(doc.totalTax)).toFixed(2))}</Text>
           </View>
           <View style={base.totalsRow}>
-            <Text style={base.totalsLabel}>Rabatt</Text>
+            <Text style={base.totalsLabel}>Positionsrabatt</Text>
             <Text style={base.totalsValue}>enthalten</Text>
+          </View>
+        </>
+      )}
+      {hasGlobalDiscount && showNet && (
+        <>
+          <View style={base.totalsRow}>
+            <Text style={base.totalsLabel}>Zwischensumme (netto)</Text>
+            <Text style={base.totalsValue}>{formatEur(rawNet.toFixed(2))}</Text>
+          </View>
+          <View style={base.totalsRow}>
+            <Text style={[base.totalsLabel, { color: "#dc2626" }]}>Gesamtrabatt {globalDiscountPct}%</Text>
+            <Text style={[base.totalsValue, { color: "#dc2626" }]}>-{formatEur((rawNet - rawNet * discountFactor).toFixed(2))}</Text>
+          </View>
+        </>
+      )}
+      {hasGlobalDiscount && showGross && !showNet && (
+        <>
+          <View style={base.totalsRow}>
+            <Text style={base.totalsLabel}>Zwischensumme (brutto)</Text>
+            <Text style={base.totalsValue}>{formatEur((rawNet + rawTax).toFixed(2))}</Text>
+          </View>
+          <View style={base.totalsRow}>
+            <Text style={[base.totalsLabel, { color: "#dc2626" }]}>Gesamtrabatt {globalDiscountPct}%</Text>
+            <Text style={[base.totalsValue, { color: "#dc2626" }]}>-{formatEur(((rawNet + rawTax) - (rawNet + rawTax) * discountFactor).toFixed(2))}</Text>
           </View>
         </>
       )}

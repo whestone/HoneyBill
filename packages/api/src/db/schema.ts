@@ -198,6 +198,7 @@ export const documents = sqliteTable("documents", {
   templateId: int("template_id"),
   einvoiceProfile: text("einvoice_profile"),
   leitwegId: text("leitweg_id"),
+  globalDiscountPct: text("global_discount_pct").notNull().default("0.00"),
   layoutOverride: text("layout_override"),
   internalNotes: text("internal_notes"),
   createdBy: int("created_by").references(() => users.id),

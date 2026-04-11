@@ -222,7 +222,7 @@ const MOCK_NUMBER: Record<DocumentType, string> = {
 function mockDoc(docType: DocumentType): HBDocument {
   return {
     id: 0, documentType: docType, documentNumber: MOCK_NUMBER[docType], status: "FINAL",
-    customerId: 0, customerSnapshot: null, layoutOverride: null,
+    customerId: 0, customerSnapshot: null, layoutOverride: null, globalDiscountPct: "0.00",
     issueDate: "2026-04-10", deliveryDate: docType === "DELIVERY_NOTE" ? "2026-04-11" : null, deliveryDateEnd: null,
     dueDate: docType === "INVOICE" ? "2026-05-10" : null, quoteValidUntil: docType === "QUOTE" ? "2026-05-10" : null,
     sourceDocumentId: null, cancelsDocumentId: null,
