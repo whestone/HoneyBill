@@ -196,6 +196,7 @@ export interface Document {
   templateId: number | null;
   einvoiceProfile: EInvoiceProfile;
   leitwegId: string | null;
+  layoutOverride: Partial<DocumentLayoutSettings> | null;
   internalNotes: string | null;
   createdBy: number | null;
   finalizedBy: number | null;
@@ -220,7 +221,104 @@ export interface PdfSettings {
   paddingBottom: number;
   logoWidth: number;
   logoHeight: number;
+  layouts: Record<DocumentType, DocumentLayoutSettings>;
 }
+
+export type TotalDisplayMode = "gross" | "net" | "both";
+
+export interface DocumentLayoutSettings {
+  // Column visibility
+  colPositionNr: boolean;
+  colDate: boolean;
+  colQuantity: boolean;
+  colUnit: boolean;
+  colPrice: boolean;
+  colDiscount: boolean;
+  colTax: boolean;
+  colTaxAmount: boolean;
+  colNetAmount: boolean;
+  colGrossAmount: boolean;
+  // Sections
+  showTotals: boolean;
+  showPaymentInfo: boolean;
+  totalDisplay: TotalDisplayMode;
+  closingText: string;
+}
+
+const LAYOUT_INVOICE: DocumentLayoutSettings = {
+  colPositionNr: true,
+  colDate: false,
+  colQuantity: true,
+  colUnit: true,
+  colPrice: true,
+  colDiscount: true,
+  colTax: true,
+  colTaxAmount: false,
+  colNetAmount: true,
+  colGrossAmount: false,
+  showTotals: true,
+  showPaymentInfo: true,
+  totalDisplay: "both",
+  closingText: "Vielen Dank für Ihren Auftrag.",
+};
+
+const LAYOUT_QUOTE: DocumentLayoutSettings = {
+  colPositionNr: true,
+  colDate: false,
+  colQuantity: true,
+  colUnit: true,
+  colPrice: true,
+  colDiscount: true,
+  colTax: true,
+  colTaxAmount: false,
+  colNetAmount: true,
+  colGrossAmount: false,
+  showTotals: true,
+  showPaymentInfo: false,
+  totalDisplay: "gross",
+  closingText: "Dieses Angebot ist 30 Tage gültig.",
+};
+
+const LAYOUT_DELIVERY_NOTE: DocumentLayoutSettings = {
+  colPositionNr: true,
+  colDate: false,
+  colQuantity: true,
+  colUnit: true,
+  colPrice: false,
+  colDiscount: false,
+  colTax: false,
+  colTaxAmount: false,
+  colNetAmount: false,
+  colGrossAmount: false,
+  showTotals: false,
+  showPaymentInfo: false,
+  totalDisplay: "gross",
+  closingText: "Bitte prüfen Sie die Lieferung auf Vollständigkeit.",
+};
+
+const LAYOUT_CREDIT_NOTE: DocumentLayoutSettings = {
+  colPositionNr: true,
+  colDate: false,
+  colQuantity: true,
+  colUnit: true,
+  colPrice: true,
+  colDiscount: true,
+  colTax: true,
+  colTaxAmount: false,
+  colNetAmount: true,
+  colGrossAmount: false,
+  showTotals: true,
+  showPaymentInfo: true,
+  totalDisplay: "both",
+  closingText: "Der Betrag wird Ihnen gutgeschrieben.",
+};
+
+export const DEFAULT_LAYOUTS: Record<DocumentType, DocumentLayoutSettings> = {
+  INVOICE: LAYOUT_INVOICE,
+  QUOTE: LAYOUT_QUOTE,
+  DELIVERY_NOTE: LAYOUT_DELIVERY_NOTE,
+  CREDIT_NOTE: LAYOUT_CREDIT_NOTE,
+};
 
 export const DEFAULT_PDF_SETTINGS: PdfSettings = {
   accentColor: "#b45309",
@@ -233,6 +331,7 @@ export const DEFAULT_PDF_SETTINGS: PdfSettings = {
   paddingBottom: 60,
   logoWidth: 100,
   logoHeight: 40,
+  layouts: DEFAULT_LAYOUTS,
 };
 
 export interface SmtpConfig {
