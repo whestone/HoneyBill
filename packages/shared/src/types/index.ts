@@ -401,6 +401,22 @@ export const EMAIL_PLACEHOLDERS: { key: string; group: string; label: string; ex
   { key: "{{mitarbeiterMobil}}", group: "Mitarbeiter", label: "Mobil", example: "+49 170 1234567" },
 ];
 
+export interface NumberSeries {
+  id: number;
+  documentType: DocumentType;
+  prefix: string;
+  suffix: string;
+  yearSegment: boolean;
+  monthSegment: boolean;
+  padding: number;
+  format: string | null;
+  nextCounter: number;
+  lastResetAt: string | null;
+  resetYearly: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CompanySettings {
   id: number;
   name: string;

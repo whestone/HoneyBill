@@ -153,6 +153,7 @@ export const numberSeries = sqliteTable("number_series", {
   yearSegment: int("year_segment", { mode: "boolean" }).notNull().default(true),
   monthSegment: int("month_segment", { mode: "boolean" }).notNull().default(false),
   padding: int("padding").notNull().default(5),
+  format: text("format"),
   nextCounter: int("next_counter").notNull().default(1),
   lastResetAt: text("last_reset_at"),
   resetYearly: int("reset_yearly", { mode: "boolean" }).notNull().default(true),

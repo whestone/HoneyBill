@@ -20,12 +20,14 @@ export const UpdateCompanySettingsSchema = z.object({
 });
 
 export const UpdateNumberSeriesSchema = z.object({
-  prefix: z.string().max(20).default(""),
-  suffix: z.string().max(20).default(""),
-  yearSegment: z.boolean().default(true),
-  monthSegment: z.boolean().default(false),
-  padding: z.number().int().min(1).max(10).default(5),
-  resetYearly: z.boolean().default(true),
+  prefix: z.string().max(20).optional(),
+  suffix: z.string().max(20).optional(),
+  yearSegment: z.boolean().optional(),
+  monthSegment: z.boolean().optional(),
+  padding: z.number().int().min(1).max(10).optional(),
+  format: z.string().max(100).nullable().optional(),
+  nextCounter: z.number().int().min(1).optional(),
+  resetYearly: z.boolean().optional(),
 });
 
 const DocumentLayoutSettingsSchema = z.object({

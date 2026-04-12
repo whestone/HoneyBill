@@ -259,7 +259,8 @@ export async function numberSeriesRoutes(app: FastifyInstance) {
   // POST /api/v1/number-series/:documentType/preview
   app.post("/:documentType/preview", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { documentType } = req.params as { documentType: string };
-    const preview = previewNextNumber(sqlite, documentType as DocumentType);
+    const body = (req.body ?? {}) as { format?: string };
+    const preview = previewNextNumber(sqlite, documentType as DocumentType, body.format);
     return reply.send({ preview });
   });
 }
