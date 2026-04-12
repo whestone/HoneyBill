@@ -192,7 +192,9 @@ export function InvoicePDF({ doc, company }: InvoicePDFProps) {
                 qty: li.quantity,
                 unit: li.unit,
                 price: formatEur(li.unitPrice),
-                discount: li.discountPct !== "0.00" ? `${li.discountPct}%` : "—",
+                discount: li.discountPct !== "0.00"
+                  ? ((li as any).discountType === "abs" ? formatEur(li.discountPct) : `${li.discountPct}%`)
+                  : "—",
                 tax: `${li.taxRatePct}%`,
                 taxAmt: formatEur(li.lineTax),
                 net: formatEur(li.lineNet),
@@ -273,11 +275,6 @@ function TotalsBlock({ doc, layout, s }: { doc: HBDocument; layout: DocumentLayo
   const lines = doc.lineItems ?? [];
   const hasLineDiscount = lines.some((li) => li.lineType === "ITEM" && li.discountPct !== "0.00");
 
-  // Global discount
-  const globalDiscountPct = parseFloat(doc.globalDiscountPct ?? "0.00");
-  const hasGlobalDiscount = globalDiscountPct > 0;
-  const discountFactor = 1 - globalDiscountPct / 100;
-
   // Raw line totals (before global discount)
   const rawNet = lines
     .filter((li) => li.lineType === "ITEM")
@@ -285,6 +282,17 @@ function TotalsBlock({ doc, layout, s }: { doc: HBDocument; layout: DocumentLayo
   const rawTax = lines
     .filter((li) => li.lineType === "ITEM")
     .reduce((acc, li) => acc + parseFloat(li.lineTax), 0);
+
+  // Global discount
+  const globalDiscountPct = parseFloat(doc.globalDiscountPct ?? "0.00");
+  const globalDiscountType = (doc.globalDiscountType ?? "pct") as "pct" | "abs";
+  const hasGlobalDiscount = globalDiscountPct > 0;
+  const discountFactor = globalDiscountType === "abs"
+    ? (rawNet > 0 ? Math.max(0, rawNet - globalDiscountPct) / rawNet : 1)
+    : 1 - globalDiscountPct / 100;
+  const globalDiscountLabel = globalDiscountType === "abs"
+    ? `Gesamtrabatt ${formatEur(String(globalDiscountPct))}`
+    : `Gesamtrabatt ${globalDiscountPct}%`;
 
   return (
     <View style={base.totalsBlock}>

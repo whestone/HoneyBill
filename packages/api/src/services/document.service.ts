@@ -62,6 +62,7 @@ export async function createDocument(
       einvoiceProfile: input.einvoiceProfile ?? null,
       leitwegId: input.leitwegId ?? null,
       globalDiscountPct: input.globalDiscountPct ?? "0.00",
+      globalDiscountType: input.globalDiscountType ?? "pct",
       layoutOverride: input.layoutOverride ? JSON.stringify(input.layoutOverride) : null,
       internalNotes: input.internalNotes ?? null,
       createdBy: userId,
@@ -154,7 +155,7 @@ export async function finalizeDocument(db: DB, docId: number, userId: number | n
     if (li.lineType !== "ITEM") continue;
     const taxRate = li.taxRate;
     const taxRatePct = taxRate?.ratePercent ?? "0.00";
-    const lineNet = computeLineNet(li.quantity, li.unitPrice, li.discountPct);
+    const lineNet = computeLineNet(li.quantity, li.unitPrice, li.discountPct, (li.discountType ?? "pct") as "pct" | "abs");
     const lineTax = computeLineTax(lineNet, taxRatePct);
     const lineGross = computeLineGross(lineNet, lineTax);
     updatedLineItems.push({ ...li, taxRatePct, lineNet, lineTax, lineGross });
@@ -164,8 +165,16 @@ export async function finalizeDocument(db: DB, docId: number, userId: number | n
   const docNumber = assignNextNumber(sqlite, doc.documentType as DocumentType, issueDate);
 
   // Build tax breakdown
-  const globalDiscountPct = new Decimal(doc.globalDiscountPct ?? "0.00");
-  const discountFactor = new Decimal(1).minus(globalDiscountPct.div(100));
+  const globalDiscountVal = new Decimal(doc.globalDiscountPct ?? "0.00");
+  const globalDiscountType = doc.globalDiscountType ?? "pct";
+  const rawSubtotal = updatedLineItems.reduce((acc: Decimal, li: any) => acc.plus(new Decimal(li.lineNet)), new Decimal(0));
+  let discountFactor: Decimal;
+  if (globalDiscountType === "abs") {
+    const absAmt = Decimal.min(globalDiscountVal, rawSubtotal);
+    discountFactor = rawSubtotal.isZero() ? new Decimal(1) : rawSubtotal.minus(absAmt).div(rawSubtotal);
+  } else {
+    discountFactor = new Decimal(1).minus(globalDiscountVal.div(100));
+  }
 
   const taxMap = new Map<string, { taxRateId: number | null; taxCategory: string; net: Decimal; tax: Decimal }>();
   for (const li of updatedLineItems) {
@@ -349,7 +358,7 @@ async function upsertLineItems(
   const values = lineItems.map((li) => {
     const taxRate = li.taxRateId ? taxRateMap.get(li.taxRateId) : null;
     const taxRatePct = taxRate?.ratePercent ?? "0.00";
-    const lineNet = li.lineType === "ITEM" ? computeLineNet(li.quantity, li.unitPrice, li.discountPct) : "0.00";
+    const lineNet = li.lineType === "ITEM" ? computeLineNet(li.quantity, li.unitPrice, li.discountPct, (li.discountType ?? "pct") as "pct" | "abs") : "0.00";
     const lineTax = li.lineType === "ITEM" ? computeLineTax(lineNet, taxRatePct) : "0.00";
     const lineGross = li.lineType === "ITEM" ? computeLineGross(lineNet, lineTax) : "0.00";
 
@@ -363,6 +372,7 @@ async function upsertLineItems(
       unit: li.unit ?? "Stk",
       unitPrice: li.unitPrice ?? "0.00",
       discountPct: li.discountPct ?? "0.00",
+      discountType: li.discountType ?? "pct",
       taxRateId: li.taxRateId ?? null,
       taxRatePct,
       lineNet,
@@ -378,8 +388,8 @@ async function upsertLineItems(
 
 async function recalcTotals(db: DB, docId: number) {
   const doc = await db.query.documents.findFirst({ where: eq(documents.id, docId) });
-  const globalDiscountPct = new Decimal(doc?.globalDiscountPct ?? "0.00");
-  const discountFactor = new Decimal(1).minus(globalDiscountPct.div(100));
+  const globalDiscountVal = new Decimal(doc?.globalDiscountPct ?? "0.00");
+  const globalDiscountType = doc?.globalDiscountType ?? "pct";
 
   const lines = await db.query.documentLineItems.findMany({
     where: and(
@@ -390,6 +400,14 @@ async function recalcTotals(db: DB, docId: number) {
 
   const rawNet = lines.reduce((acc, li) => acc.plus(new Decimal(li.lineNet)), new Decimal(0));
   const rawTax = lines.reduce((acc, li) => acc.plus(new Decimal(li.lineTax)), new Decimal(0));
+
+  let discountFactor: Decimal;
+  if (globalDiscountType === "abs") {
+    const absAmt = Decimal.min(globalDiscountVal, rawNet);
+    discountFactor = rawNet.isZero() ? new Decimal(1) : rawNet.minus(absAmt).div(rawNet);
+  } else {
+    discountFactor = new Decimal(1).minus(globalDiscountVal.div(100));
+  }
 
   const subtotalNet = rawNet.mul(discountFactor).toDecimalPlaces(2, 4).toFixed(2);
   const totalTax = rawTax.mul(discountFactor).toDecimalPlaces(2, 4).toFixed(2);

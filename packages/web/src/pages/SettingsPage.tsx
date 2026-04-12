@@ -233,7 +233,7 @@ const MOCK_NUMBER: Record<DocumentType, string> = {
 function mockDoc(docType: DocumentType): HBDocument {
   return {
     id: 0, documentType: docType, documentNumber: MOCK_NUMBER[docType], status: "FINAL",
-    customerId: 0, customerSnapshot: null, layoutOverride: null, globalDiscountPct: "0.00",
+    customerId: 0, customerSnapshot: null, layoutOverride: null, globalDiscountPct: "0.00", globalDiscountType: "pct" as const,
     issueDate: "2026-04-10", deliveryDate: docType === "DELIVERY_NOTE" ? "2026-04-11" : null, deliveryDateEnd: null,
     dueDate: docType === "INVOICE" ? "2026-05-10" : null, quoteValidUntil: docType === "QUOTE" ? "2026-05-10" : null,
     sourceDocumentId: null, cancelsDocumentId: null,
@@ -255,15 +255,15 @@ function mockDoc(docType: DocumentType): HBDocument {
     lineItems: [
       { id: 1, documentId: 0, position: 0, lineType: "ITEM", productId: null, productSnapshot: null,
         description: "Webentwicklung (Frontend)", quantity: "8", unit: "Std",
-        unitPrice: "120.00", discountPct: "0.00", taxRateId: 1, taxRatePct: "19.00",
+        unitPrice: "120.00", discountPct: "0.00", discountType: "pct" as const, taxRateId: 1, taxRatePct: "19.00",
         lineNet: "960.00", lineTax: "182.40", lineGross: "1142.40", createdAt: "" },
-      { id: 2, documentId: 0, position: 1, lineType: "ITEM", productId: null, productSnapshot: null,
+      { id: 2, documentId: 0, position: 1, lineType: "ITEM" as const, productId: null, productSnapshot: null,
         description: "Beratung & Konzeption", quantity: "4", unit: "Std",
-        unitPrice: "150.00", discountPct: "10.00", taxRateId: 1, taxRatePct: "19.00",
+        unitPrice: "150.00", discountPct: "10.00", discountType: "pct" as const, taxRateId: 1, taxRatePct: "19.00",
         lineNet: "540.00", lineTax: "102.60", lineGross: "642.60", createdAt: "" },
-      { id: 3, documentId: 0, position: 2, lineType: "ITEM", productId: null, productSnapshot: null,
+      { id: 3, documentId: 0, position: 2, lineType: "ITEM" as const, productId: null, productSnapshot: null,
         description: "Hosting (jährlich)", quantity: "1", unit: "Jahr",
-        unitPrice: "180.67", discountPct: "0.00", taxRateId: 1, taxRatePct: "19.00",
+        unitPrice: "180.67", discountPct: "0.00", discountType: "pct" as const, taxRateId: 1, taxRatePct: "19.00",
         lineNet: "180.67", lineTax: "34.33", lineGross: "215.00", createdAt: "" },
     ],
     taxLines: [

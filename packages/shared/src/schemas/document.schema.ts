@@ -10,6 +10,7 @@ const LineItemSchema = z.object({
   unit: z.string().max(50).default("Stk"),
   unitPrice: z.string().regex(/^-?\d+(\.\d{1,4})?$/).default("0.00"),
   discountPct: z.string().regex(/^\d+(\.\d{1,4})?$/).default("0.00"),
+  discountType: z.enum(["pct", "abs"]).default("pct"),
   taxRateId: z.number().int().positive().nullable().optional(),
 });
 
@@ -45,6 +46,7 @@ export const CreateDocumentSchema = z.object({
   einvoiceProfile: z.enum(["ZUGFERD_EXTENDED", "XRECHNUNG"]).nullable().optional(),
   leitwegId: z.string().max(100).nullable().optional(),
   globalDiscountPct: z.string().regex(/^\d+(\.\d{1,4})?$/).default("0.00").optional(),
+  globalDiscountType: z.enum(["pct", "abs"]).default("pct").optional(),
   layoutOverride: DocumentLayoutOverrideSchema,
   internalNotes: z.string().max(5000).nullable().optional(),
   lineItems: z.array(LineItemSchema).min(0),
