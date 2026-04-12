@@ -142,17 +142,19 @@ export function DocumentEditorPage() {
   const rawTotalTax = rows
     .reduce((acc, r) => acc.plus(new Decimal(r.lineTax)), new Decimal(0));
 
+  const rawTotalGross = rawSubtotalNet.plus(rawTotalTax);
   const gDiscount = new Decimal(globalDiscountPct || "0");
   const hasGlobalDiscount = gDiscount.greaterThan(0);
   let discountFactor: Decimal;
-  let globalDiscountNet: Decimal;
+  let globalDiscountDisplay: Decimal; // amount shown as "discount" in sidebar
   if (globalDiscountType === "abs") {
-    const absAmt = Decimal.min(gDiscount, rawSubtotalNet);
-    globalDiscountNet = absAmt;
-    discountFactor = rawSubtotalNet.isZero() ? new Decimal(1) : rawSubtotalNet.minus(absAmt).div(rawSubtotalNet);
+    // abs discount reduces the gross directly
+    const absAmt = Decimal.min(gDiscount, rawTotalGross);
+    globalDiscountDisplay = absAmt;
+    discountFactor = rawTotalGross.isZero() ? new Decimal(1) : rawTotalGross.minus(absAmt).div(rawTotalGross);
   } else {
     discountFactor = new Decimal(1).minus(gDiscount.div(100));
-    globalDiscountNet = rawSubtotalNet.minus(rawSubtotalNet.mul(discountFactor).toDecimalPlaces(2, Decimal.ROUND_HALF_UP));
+    globalDiscountDisplay = rawSubtotalNet.minus(rawSubtotalNet.mul(discountFactor).toDecimalPlaces(2, Decimal.ROUND_HALF_UP));
   }
 
   const subtotalNet = rawSubtotalNet.mul(discountFactor).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toFixed(2);
@@ -481,7 +483,7 @@ export function DocumentEditorPage() {
             {hasGlobalDiscount && (
               <div className="flex justify-between text-red-600">
                 <span>Gesamtrabatt {globalDiscountType === "abs" ? `${globalDiscountPct} €` : `${globalDiscountPct}%`}</span>
-                <span>-{formatEur(globalDiscountNet.toFixed(2))}</span>
+                <span>-{formatEur(globalDiscountDisplay.toFixed(2))}</span>
               </div>
             )}
             <div className="flex justify-between">
