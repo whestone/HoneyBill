@@ -1195,6 +1195,7 @@ function UserFormModal({
     try {
       if (isEdit) {
         const patch: Record<string, unknown> = {
+          email: form.email,
           fullName: form.fullName,
           role: form.role,
         };
@@ -1219,18 +1220,16 @@ function UserFormModal({
   return (
     <Modal open onClose={onClose} title={isEdit ? "Benutzer bearbeiten" : "Benutzer hinzufügen"} size="sm">
       <form onSubmit={handleSubmit} className="space-y-4">
-        {!isEdit && (
-          <div>
-            <label className="label">E-Mail-Adresse</label>
-            <input
-              className="input"
-              type="email"
-              required
-              value={form.email}
-              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-            />
-          </div>
-        )}
+        <div>
+          <label className="label">E-Mail-Adresse</label>
+          <input
+            className="input"
+            type="email"
+            required
+            value={form.email}
+            onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+          />
+        </div>
         <div>
           <label className="label">Name</label>
           <input
