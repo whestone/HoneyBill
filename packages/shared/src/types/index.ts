@@ -131,6 +131,7 @@ export interface DocumentLineItem {
   unit: string;
   unitPrice: string;
   discountPct: string;
+  discountType: "pct" | "abs";
   taxRateId: number | null;
   taxRatePct: string;
   lineNet: string;
@@ -197,6 +198,7 @@ export interface Document {
   einvoiceProfile: EInvoiceProfile;
   leitwegId: string | null;
   globalDiscountPct: string;
+  globalDiscountType: "pct" | "abs";
   layoutOverride: Partial<DocumentLayoutSettings> | null;
   internalNotes: string | null;
   createdBy: number | null;

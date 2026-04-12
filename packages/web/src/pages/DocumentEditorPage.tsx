@@ -41,6 +41,7 @@ interface LineRow {
   unit: string;
   unitPrice: string;
   discountPct: string;
+  discountType: "pct" | "abs";
   taxRateId: number | null;
   // computed
   lineNet: string;
@@ -65,6 +66,7 @@ function toRow(li: DocumentLineItem, taxRates: TaxRate[]): LineRow {
     unit: li.unit,
     unitPrice: li.unitPrice,
     discountPct: li.discountPct,
+    discountType: (li.discountType ?? "pct") as "pct" | "abs",
     taxRateId: li.taxRateId ?? null,
     lineNet: li.lineNet,
     lineTax: li.lineTax,
@@ -76,7 +78,7 @@ function recompute(row: LineRow, taxRates: TaxRate[]): LineRow {
   if (row.lineType !== "ITEM") return { ...row, lineNet: "0.00", lineTax: "0.00", lineGross: "0.00" };
   const taxRate = taxRates.find((tr) => tr.id === row.taxRateId);
   const taxRatePct = taxRate?.ratePercent ?? "0.00";
-  const lineNet = computeLineNet(row.quantity || "0", row.unitPrice || "0", row.discountPct || "0");
+  const lineNet = computeLineNet(row.quantity || "0", row.unitPrice || "0", row.discountPct || "0", row.discountType);
   const lineTax = computeLineTax(lineNet, taxRatePct);
   const lineGross = computeLineGross(lineNet, lineTax);
   return { ...row, lineNet, lineTax, lineGross };
@@ -111,6 +113,7 @@ export function DocumentEditorPage() {
   const [internalNotes, setInternalNotes] = useState("");
   const [einvoiceProfile, setEinvoiceProfile] = useState<string>("");
   const [globalDiscountPct, setGlobalDiscountPct] = useState("0.00");
+  const [globalDiscountType, setGlobalDiscountType] = useState<"pct" | "abs">("pct");
   const [layoutOverride, setLayoutOverride] = useState<Partial<DocumentLayoutSettings> | null>(null);
   const [showLayoutSettings, setShowLayoutSettings] = useState(false);
 
@@ -123,6 +126,7 @@ export function DocumentEditorPage() {
     setInternalNotes(doc.internalNotes ?? "");
     setEinvoiceProfile(doc.einvoiceProfile ?? "");
     setGlobalDiscountPct(doc.globalDiscountPct ?? "0.00");
+    setGlobalDiscountType((doc.globalDiscountType ?? "pct") as "pct" | "abs");
     const lo = (() => {
       const raw = (doc as any).layoutOverride;
       if (!raw) return null;
@@ -139,9 +143,17 @@ export function DocumentEditorPage() {
     .reduce((acc, r) => acc.plus(new Decimal(r.lineTax)), new Decimal(0));
 
   const gDiscount = new Decimal(globalDiscountPct || "0");
-  const discountFactor = new Decimal(1).minus(gDiscount.div(100));
-  const globalDiscountNet = rawSubtotalNet.minus(rawSubtotalNet.mul(discountFactor).toDecimalPlaces(2, Decimal.ROUND_HALF_UP));
   const hasGlobalDiscount = gDiscount.greaterThan(0);
+  let discountFactor: Decimal;
+  let globalDiscountNet: Decimal;
+  if (globalDiscountType === "abs") {
+    const absAmt = Decimal.min(gDiscount, rawSubtotalNet);
+    globalDiscountNet = absAmt;
+    discountFactor = rawSubtotalNet.isZero() ? new Decimal(1) : rawSubtotalNet.minus(absAmt).div(rawSubtotalNet);
+  } else {
+    discountFactor = new Decimal(1).minus(gDiscount.div(100));
+    globalDiscountNet = rawSubtotalNet.minus(rawSubtotalNet.mul(discountFactor).toDecimalPlaces(2, Decimal.ROUND_HALF_UP));
+  }
 
   const subtotalNet = rawSubtotalNet.mul(discountFactor).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toFixed(2);
 
@@ -185,6 +197,7 @@ export function DocumentEditorPage() {
         unit: "Stk",
         unitPrice: "0.00",
         discountPct: "0.00",
+        discountType: "pct",
         taxRateId: defaultTaxRate?.id ?? null,
         lineNet: "0.00",
         lineTax: "0.00",
@@ -222,6 +235,7 @@ export function DocumentEditorPage() {
         internalNotes: internalNotes || null,
         einvoiceProfile: einvoiceProfile || null,
         globalDiscountPct: globalDiscountPct || "0.00",
+        globalDiscountType,
         layoutOverride: layoutOverride || null,
         lineItems: rows.map((r, i) => ({
           position: i,
@@ -232,6 +246,7 @@ export function DocumentEditorPage() {
           unit: r.unit,
           unitPrice: r.unitPrice,
           discountPct: r.discountPct,
+          discountType: r.discountType,
           taxRateId: r.taxRateId,
         })),
       });
@@ -240,7 +255,7 @@ export function DocumentEditorPage() {
     } finally {
       setSaving(false);
     }
-  }, [doc, rows, deliveryDate, paymentDays, internalNotes, einvoiceProfile, globalDiscountPct, layoutOverride, qc]);
+  }, [doc, rows, deliveryDate, paymentDays, internalNotes, einvoiceProfile, globalDiscountPct, globalDiscountType, layoutOverride, qc]);
 
   const handleFinalize = async () => {
     setFinalizeError(null);
@@ -465,7 +480,7 @@ export function DocumentEditorPage() {
             )}
             {hasGlobalDiscount && (
               <div className="flex justify-between text-red-600">
-                <span>Gesamtrabatt {globalDiscountPct}%</span>
+                <span>Gesamtrabatt {globalDiscountType === "abs" ? `${globalDiscountPct} €` : `${globalDiscountPct}%`}</span>
                 <span>-{formatEur(globalDiscountNet.toFixed(2))}</span>
               </div>
             )}
@@ -487,17 +502,31 @@ export function DocumentEditorPage() {
 
           {/* Global discount */}
           <div>
-            <label className="label">Gesamtrabatt %</label>
-            <input
-              type="number"
-              className="input text-sm"
-              min={0}
-              max={100}
-              step={0.01}
-              value={globalDiscountPct}
-              onChange={(e) => { setGlobalDiscountPct(e.target.value); setDirty(true); }}
-              placeholder="0.00"
-            />
+            <label className="label">Gesamtrabatt</label>
+            <div className="flex gap-1">
+              <input
+                type="number"
+                className="input text-sm flex-1 min-w-0"
+                min={0}
+                max={globalDiscountType === "pct" ? 100 : undefined}
+                step={0.01}
+                value={globalDiscountPct}
+                onChange={(e) => { setGlobalDiscountPct(e.target.value); setDirty(true); }}
+                placeholder="0.00"
+              />
+              <div className="flex rounded border border-gray-300 overflow-hidden text-xs">
+                <button
+                  type="button"
+                  onClick={() => { setGlobalDiscountType("pct"); setDirty(true); }}
+                  className={`px-2 py-1 ${globalDiscountType === "pct" ? "bg-honey-500 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
+                >%</button>
+                <button
+                  type="button"
+                  onClick={() => { setGlobalDiscountType("abs"); setDirty(true); }}
+                  className={`px-2 py-1 ${globalDiscountType === "abs" ? "bg-honey-500 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
+                >€</button>
+              </div>
+            </div>
           </div>
 
           {/* Layout override button */}
@@ -643,16 +672,28 @@ function LineItemRow({ row, idx, taxRates, onChange, onRemove, onProductSelect }
           step="0.01"
         />
 
-        {/* Discount */}
-        <input
-          className="text-sm text-right bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-honey-300 rounded px-1 py-0.5"
-          value={row.discountPct}
-          onChange={(e) => onChange({ discountPct: e.target.value })}
-          type="number"
-          min="0"
-          max="100"
-          step="0.01"
-        />
+        {/* Discount + type toggle */}
+        <div className="flex items-center gap-0.5">
+          <input
+            className="text-sm text-right bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-honey-300 rounded px-1 py-0.5 w-12"
+            value={row.discountPct}
+            onChange={(e) => onChange({ discountPct: e.target.value })}
+            type="number"
+            min="0"
+            max={row.discountType === "pct" ? 100 : undefined}
+            step="0.01"
+          />
+          <div className="flex rounded border border-gray-200 overflow-hidden text-xs">
+            <button type="button"
+              onClick={() => onChange({ discountType: "pct" })}
+              className={`px-1 py-0.5 leading-none ${row.discountType === "pct" ? "bg-honey-400 text-white" : "text-gray-400 hover:bg-gray-50"}`}
+            >%</button>
+            <button type="button"
+              onClick={() => onChange({ discountType: "abs" })}
+              className={`px-1 py-0.5 leading-none ${row.discountType === "abs" ? "bg-honey-400 text-white" : "text-gray-400 hover:bg-gray-50"}`}
+            >€</button>
+          </div>
+        </div>
 
         {/* Tax rate */}
         <select
