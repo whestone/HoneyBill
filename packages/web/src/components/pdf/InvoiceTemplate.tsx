@@ -295,70 +295,73 @@ function TotalsBlock({ doc, layout, s }: { doc: HBDocument; layout: DocumentLayo
     ? `Gesamtrabatt ${formatEur(String(globalDiscountPct))}`
     : `Gesamtrabatt ${globalDiscountPct}%`;
 
-  // Tax breakdown: use finalized taxLines if available, otherwise compute from line items
-  const taxBreakdown: { pct: string; amount: string }[] = (() => {
-    const tl = doc.taxLines ?? [];
-    if (tl.length > 0) {
-      return tl.map((t) => ({ pct: t.taxRatePct, amount: t.taxAmount }));
-    }
+  // Tax breakdown per rate.
+  // For abs global discount: show RAW tax (before gross deduction) so that
+  //   Netto + ΣUSt - Bruttorabatt = Gesamtsumme adds up exactly.
+  // For pct global discount: show discounted tax (discountFactor already applied to net).
+  const taxBreakdownRaw = (() => {
     const map = new Map<string, number>();
     for (const li of lines.filter((l) => l.lineType === "ITEM")) {
       const pct = li.taxRatePct ?? "0.00";
-      map.set(pct, (map.get(pct) ?? 0) + parseFloat(li.lineTax) * discountFactor);
+      map.set(pct, (map.get(pct) ?? 0) + parseFloat(li.lineTax));
     }
     return Array.from(map.entries())
       .sort((a, b) => parseFloat(a[0]) - parseFloat(b[0]))
-      .map(([pct, amount]) => ({ pct, amount: amount.toFixed(2) }));
+      .map(([pct, amount]) => ({ pct, amount }));
+  })();
+
+  const taxBreakdown: { pct: string; amount: string }[] = (() => {
+    if (globalDiscountType === "abs") {
+      // Use raw tax; the abs discount is deducted separately at gross level
+      return taxBreakdownRaw.map(({ pct, amount }) => ({ pct, amount: amount.toFixed(2) }));
+    }
+    // pct discount: use finalized taxLines if available, else compute with discountFactor
+    const tl = doc.taxLines ?? [];
+    if (tl.length > 0) return tl.map((t) => ({ pct: t.taxRatePct, amount: t.taxAmount }));
+    return taxBreakdownRaw.map(({ pct, amount }) => ({ pct, amount: (amount * discountFactor).toFixed(2) }));
   })();
 
   return (
     <View style={base.totalsBlock}>
-      {showGross && hasLineDiscount && !hasGlobalDiscount && (
-        <>
-          <View style={base.totalsRow}>
-            <Text style={base.totalsLabel}>Zwischensumme (brutto)</Text>
-            <Text style={base.totalsValue}>{formatEur((parseFloat(doc.subtotalNet) + parseFloat(doc.totalTax)).toFixed(2))}</Text>
-          </View>
-          <View style={base.totalsRow}>
-            <Text style={base.totalsLabel}>Positionsrabatt</Text>
-            <Text style={base.totalsValue}>enthalten</Text>
-          </View>
-        </>
-      )}
-      {hasGlobalDiscount && (
-        <>
-          <View style={base.totalsRow}>
-            <Text style={base.totalsLabel}>
-              {globalDiscountType === "abs" ? "Zwischensumme (brutto)" : showNet ? "Zwischensumme (netto)" : "Zwischensumme (brutto)"}
-            </Text>
-            <Text style={base.totalsValue}>
-              {globalDiscountType === "abs"
-                ? formatEur(rawGross.toFixed(2))
-                : showNet ? formatEur(rawNet.toFixed(2)) : formatEur(rawGross.toFixed(2))}
-            </Text>
-          </View>
-          <View style={base.totalsRow}>
-            <Text style={[base.totalsLabel, { color: "#dc2626" }]}>{globalDiscountLabel}</Text>
-            <Text style={[base.totalsValue, { color: "#dc2626" }]}>
-              {globalDiscountType === "abs"
-                ? `-${formatEur(String(globalDiscountPct))}`
-                : `-${formatEur((rawGross - rawGross * discountFactor).toFixed(2))}`}
-            </Text>
-          </View>
-        </>
-      )}
+      {/* 1. Netto */}
       {showNet && (
         <View style={base.totalsRow}>
           <Text style={base.totalsLabel}>Nettobetrag</Text>
-          <Text style={base.totalsValue}>{formatEur(doc.subtotalNet)}</Text>
+          <Text style={base.totalsValue}>{formatEur(rawNet.toFixed(2))}</Text>
         </View>
       )}
-      {(showNet || showGross) && taxBreakdown.map(({ pct, amount }) => (
+
+      {/* 2. Nettorabatt (nur bei %-Rabatt) */}
+      {hasGlobalDiscount && globalDiscountType === "pct" && (
+        <View style={base.totalsRow}>
+          <Text style={[base.totalsLabel, { color: "#dc2626" }]}>Nettorabatt {globalDiscountPct}%</Text>
+          <Text style={[base.totalsValue, { color: "#dc2626" }]}>
+            -{formatEur((rawNet * (globalDiscountPct / 100)).toFixed(2))}
+          </Text>
+        </View>
+      )}
+
+      {/* 3. Steuer pro Steuersatz */}
+      {taxBreakdown.map(({ pct, amount }) => (
         <View key={pct} style={base.totalsRow}>
           <Text style={base.totalsLabel}>USt. {pct}%</Text>
           <Text style={base.totalsValue}>{formatEur(amount)}</Text>
         </View>
       ))}
+
+      {/* 4. Bruttorabatt (nur bei €-Rabatt) */}
+      {hasGlobalDiscount && globalDiscountType === "abs" && (
+        <View style={base.totalsRow}>
+          <Text style={[base.totalsLabel, { color: "#dc2626" }]}>
+            Bruttorabatt {formatEur(String(globalDiscountPct))}
+          </Text>
+          <Text style={[base.totalsValue, { color: "#dc2626" }]}>
+            -{formatEur(String(globalDiscountPct))}
+          </Text>
+        </View>
+      )}
+
+      {/* 5. Gesamtsumme */}
       <View style={[base.totalGrossRow, { borderTopColor: s.accentColor }]}>
         <Text style={[base.totalGrossLabel, { fontSize: s.bodyFontSize + 2 }]}>Gesamtsumme</Text>
         <Text style={[base.totalGrossValue, { fontSize: s.bodyFontSize + 2, color: s.accentColor }]}>
@@ -383,9 +386,9 @@ function buildColumns(layout: DocumentLayoutSettings): Column[] {
   if (layout.colUnit) cols.push({ key: "unit", header: "Einheit", style: { width: "7%", textAlign: "center" } });
   if (layout.colPrice) cols.push({ key: "price", header: "Einzelpreis", style: { width: "10%", textAlign: "right" } });
   if (layout.colDiscount) cols.push({ key: "discount", header: "Rabatt", style: { width: "7%", textAlign: "right" } });
+  if (layout.colNetAmount) cols.push({ key: "net", header: "Nettobetrag", style: { width: "10%", textAlign: "right" } });
   if (layout.colTax) cols.push({ key: "tax", header: "USt. %", style: { width: "7%", textAlign: "right" } });
   if (layout.colTaxAmount) cols.push({ key: "taxAmt", header: "USt.", style: { width: "8%", textAlign: "right" } });
-  if (layout.colNetAmount) cols.push({ key: "net", header: "Nettobetrag", style: { width: "10%", textAlign: "right" } });
   if (layout.colGrossAmount) cols.push({ key: "gross", header: "Betrag", style: { width: "10%", textAlign: "right" } });
 
   return cols;
