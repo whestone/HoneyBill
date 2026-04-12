@@ -800,16 +800,21 @@ function EmailTab() {
             </div>
           </div>
           {/* Placeholder sidebar */}
-          <div className="w-56 shrink-0 border-l border-gray-100 pl-4">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Platzhalter</p>
-            <div className="space-y-2">
-              {EMAIL_PLACEHOLDERS.map((p) => (
-                <div key={p.key}>
-                  <span className="font-mono text-xs text-gray-700 block leading-tight">{p.key}</span>
-                  <span className="text-xs text-gray-400">{p.example}</span>
+          <div className="w-64 shrink-0 border-l border-gray-100 pl-4 space-y-4 overflow-y-auto max-h-[600px]">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Platzhalter</p>
+            {(["Dokument", "Kunde", "Firma", "Mitarbeiter"] as const).map((group) => (
+              <div key={group}>
+                <p className="text-xs font-semibold text-gray-700 mb-1">{group}</p>
+                <div className="space-y-1">
+                  {EMAIL_PLACEHOLDERS.filter((p) => p.group === group).map((p) => (
+                    <div key={p.key}>
+                      <span className="font-mono text-xs text-honey-700 block leading-tight">{p.key}</span>
+                      <span className="text-xs text-gray-400">{p.label}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

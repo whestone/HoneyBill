@@ -18,7 +18,7 @@ import { StatusBadge, TypeBadge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { PdfPreview } from "@/components/pdf/PdfPreview";
 import { formatEur, DOCUMENT_TYPE_LABELS, DEFAULT_EMAIL_SETTINGS } from "@honeybill/shared";
-import type { CompanySettings, Document, DocumentType } from "@honeybill/shared";
+import type { CompanySettings, Document, DocumentType, User } from "@honeybill/shared";
 import { ArrowLeft, CheckCircle, CreditCard, Edit2, FileText, Send, Truck, Trash2, XCircle, Mail } from "lucide-react";
 import { pdf } from "@react-pdf/renderer";
 import { InvoicePDF } from "@/components/pdf/InvoiceTemplate";
@@ -38,6 +38,10 @@ export function DocumentDetailPage() {
   const { data: company } = useQuery<CompanySettings>({
     queryKey: ["company-settings"],
     queryFn: () => api.get("/settings/company"),
+  });
+  const { data: me } = useQuery<User>({
+    queryKey: ["me"],
+    queryFn: () => api.get("/auth/me"),
   });
 
   const finalize = useFinalizeDocument();
@@ -458,6 +462,7 @@ export function DocumentDetailPage() {
           onClose={() => setShowEmail(false)}
           doc={doc}
           company={company}
+          me={me ?? null}
         />
       )}
     </div>
@@ -472,7 +477,7 @@ function parseCustomer(doc: Document): any {
   return raw ?? null;
 }
 
-function resolvePlaceholders(template: string, doc: Document, company: CompanySettings): string {
+function resolvePlaceholders(template: string, doc: Document, company: CompanySettings, me: User | null = null): string {
   const customer = parseCustomer(doc);
   const customerName =
     customer?.companyName ||
@@ -487,31 +492,52 @@ function resolvePlaceholders(template: string, doc: Document, company: CompanySe
   })();
   const typeLabel =
     DOCUMENT_TYPE_LABELS[doc.documentType as keyof typeof DOCUMENT_TYPE_LABELS] ?? doc.documentType;
-  const dueDate = doc.dueDate
-    ? new Date(doc.dueDate).toLocaleDateString("de-DE")
-    : "";
+  const dueDate = doc.dueDate ? new Date(doc.dueDate).toLocaleDateString("de-DE") : "";
+  const issueDate = doc.issueDate ? new Date(doc.issueDate).toLocaleDateString("de-DE") : "";
   const zahlungshinweis =
     doc.documentType === "INVOICE" && doc.dueDate
-      ? `Bitte überweisen Sie den Betrag bis zum ${dueDate} auf unser Konto${
-          company.bankIban ? ` (IBAN: ${company.bankIban})` : ""
-        }.`
+      ? `Bitte überweisen Sie den Betrag bis zum ${dueDate} auf unser Konto${company.bankIban ? ` (IBAN: ${company.bankIban})` : ""}.`
       : "";
   return template
-    .replace(/\{\{anrede\}\}/g, anrede)
+    // Dokument
     .replace(/\{\{dokumentNummer\}\}/g, doc.documentNumber ?? "")
     .replace(/\{\{dokumentTyp\}\}/g, typeLabel)
-    .replace(/\{\{kundenName\}\}/g, customerName)
-    .replace(/\{\{betrag\}\}/g, formatEur(doc.totalGross))
+    .replace(/\{\{ausstellungsDatum\}\}/g, issueDate)
     .replace(/\{\{faelligkeitsDatum\}\}/g, dueDate)
+    .replace(/\{\{nettobetrag\}\}/g, formatEur(doc.subtotalNet))
+    .replace(/\{\{betrag\}\}/g, formatEur(doc.totalGross))
+    .replace(/\{\{zahlungshinweis\}\}/g, zahlungshinweis)
+    // Kunde
+    .replace(/\{\{anrede\}\}/g, anrede)
+    .replace(/\{\{kundenName\}\}/g, customerName)
+    .replace(/\{\{kundenVorname\}\}/g, customer?.firstName ?? "")
+    .replace(/\{\{kundenNachname\}\}/g, customer?.lastName ?? "")
+    .replace(/\{\{kundenFirma\}\}/g, customer?.companyName ?? "")
+    .replace(/\{\{kundenEmail\}\}/g, customer?.email ?? "")
+    .replace(/\{\{kundenTelefon\}\}/g, customer?.phone ?? "")
+    .replace(/\{\{kundenStrasse\}\}/g, customer?.billStreet ?? "")
+    .replace(/\{\{kundenPlz\}\}/g, customer?.billZip ?? "")
+    .replace(/\{\{kundenOrt\}\}/g, customer?.billCity ?? "")
+    .replace(/\{\{kundenUstId\}\}/g, customer?.vatId ?? "")
+    // Firma
     .replace(/\{\{firmenName\}\}/g, company.name)
-    .replace(/\{\{zahlungshinweis\}\}/g, zahlungshinweis);
+    .replace(/\{\{firmenStrasse\}\}/g, company.street ?? "")
+    .replace(/\{\{firmenPlz\}\}/g, company.zip ?? "")
+    .replace(/\{\{firmenOrt\}\}/g, company.city ?? "")
+    .replace(/\{\{firmenEmail\}\}/g, company.email ?? "")
+    .replace(/\{\{firmenTelefon\}\}/g, company.phone ?? "")
+    .replace(/\{\{firmenIban\}\}/g, company.bankIban ?? "")
+    .replace(/\{\{firmenUstId\}\}/g, company.vatId ?? "")
+    // Mitarbeiter
+    .replace(/\{\{mitarbeiterName\}\}/g, me?.fullName ?? "")
+    .replace(/\{\{mitarbeiterEmail\}\}/g, me?.email ?? "");
 }
 
 // ─── Send E-Mail Modal ────────────────────────────────────────────────────────
 
 function SendEmailModal({
-  open, onClose, doc, company,
-}: { open: boolean; onClose: () => void; doc: Document; company: CompanySettings }) {
+  open, onClose, doc, company, me,
+}: { open: boolean; onClose: () => void; doc: Document; company: CompanySettings; me: User | null }) {
   const emailSettings = company.emailSettings ?? DEFAULT_EMAIL_SETTINGS;
   const customer = parseCustomer(doc);
   const customerDisplayName =
@@ -521,10 +547,10 @@ function SendEmailModal({
 
   const [to, setTo] = useState(customer?.email ?? "");
   const [subject, setSubject] = useState(() =>
-    resolvePlaceholders(emailSettings.defaultSubject, doc, company)
+    resolvePlaceholders(emailSettings.defaultSubject, doc, company, me)
   );
   const [body, setBody] = useState(() =>
-    resolvePlaceholders(emailSettings.defaultBody, doc, company)
+    resolvePlaceholders(emailSettings.defaultBody, doc, company, me)
   );
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message?: string } | null>(null);

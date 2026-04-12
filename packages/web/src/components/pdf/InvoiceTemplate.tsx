@@ -195,7 +195,7 @@ export function InvoicePDF({ doc, company }: InvoicePDFProps) {
                 discount: li.discountPct !== "0.00"
                   ? ((li as any).discountType === "abs" ? formatEur(li.discountPct) : `${li.discountPct}%`)
                   : "—",
-                tax: `${li.taxRatePct}%`,
+                tax: `${parseFloat(li.taxRatePct).toLocaleString("de-DE")}%`,
                 taxAmt: formatEur(li.lineTax),
                 net: formatEur(li.lineNet),
                 gross: formatEur(lineGross),
@@ -329,8 +329,8 @@ function TotalsBlock({ doc, layout, s }: { doc: HBDocument; layout: DocumentLayo
         <View style={base.totalsRow}>
           <Text style={[base.totalsLabel, { color: "#dc2626" }]}>
             {globalDiscountType === "abs"
-              ? `Nettorabatt ${formatEur(String(globalDiscountPct))}`
-              : `Nettorabatt ${globalDiscountPct}%`}
+              ? `Rabatt ${formatEur(String(globalDiscountPct))}`
+              : `Rabatt ${globalDiscountPct}%`}
           </Text>
           <Text style={[base.totalsValue, { color: "#dc2626" }]}>
             -{globalDiscountType === "abs"
@@ -341,9 +341,9 @@ function TotalsBlock({ doc, layout, s }: { doc: HBDocument; layout: DocumentLayo
       )}
 
       {/* 3. Steuer pro Steuersatz */}
-      {taxBreakdown.map(({ pct, amount }) => (
+      {(showNet || showGross) && taxBreakdown.map(({ pct, amount }) => (
         <View key={pct} style={base.totalsRow}>
-          <Text style={base.totalsLabel}>USt. {pct}%</Text>
+          <Text style={base.totalsLabel}>USt. {parseFloat(pct).toLocaleString("de-DE")}%</Text>
           <Text style={base.totalsValue}>{formatEur(amount)}</Text>
         </View>
       ))}
