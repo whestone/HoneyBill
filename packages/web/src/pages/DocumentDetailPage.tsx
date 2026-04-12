@@ -479,16 +479,14 @@ function parseCustomer(doc: Document): any {
 
 function resolvePlaceholders(template: string, doc: Document, company: CompanySettings, me: User | null = null): string {
   const customer = parseCustomer(doc);
-  const customerName =
-    customer?.companyName ||
-    `${customer?.firstName ?? ""} ${customer?.lastName ?? ""}`.trim() ||
-    "—";
+  // {{kundenName}} = always company name
+  const kundenName = customer?.companyName ?? "—";
+  // {{anrede}} = just "Herr" / "Frau" / empty
   const anrede = (() => {
-    const lastName = (customer?.lastName ?? "").trim();
-    if (!lastName) return "Sehr geehrte Damen und Herren,";
     const sal = (customer?.salutation ?? "").toLowerCase();
-    const form = sal === "frau" ? "geehrte Frau" : sal === "herr" ? "geehrter Herr" : "geehrte/r";
-    return `Sehr ${form} ${lastName},`;
+    if (sal === "herr") return "Herr";
+    if (sal === "frau") return "Frau";
+    return "";
   })();
   const typeLabel =
     DOCUMENT_TYPE_LABELS[doc.documentType as keyof typeof DOCUMENT_TYPE_LABELS] ?? doc.documentType;
@@ -498,6 +496,7 @@ function resolvePlaceholders(template: string, doc: Document, company: CompanySe
     doc.documentType === "INVOICE" && doc.dueDate
       ? `Bitte überweisen Sie den Betrag bis zum ${dueDate} auf unser Konto${company.bankIban ? ` (IBAN: ${company.bankIban})` : ""}.`
       : "";
+  const mitarbeiterName = me ? `${me.firstName ?? ""} ${me.lastName ?? ""}`.trim() || me.fullName : "";
   return template
     // Dokument
     .replace(/\{\{dokumentNummer\}\}/g, doc.documentNumber ?? "")
@@ -509,7 +508,7 @@ function resolvePlaceholders(template: string, doc: Document, company: CompanySe
     .replace(/\{\{zahlungshinweis\}\}/g, zahlungshinweis)
     // Kunde
     .replace(/\{\{anrede\}\}/g, anrede)
-    .replace(/\{\{kundenName\}\}/g, customerName)
+    .replace(/\{\{kundenName\}\}/g, kundenName)
     .replace(/\{\{kundenVorname\}\}/g, customer?.firstName ?? "")
     .replace(/\{\{kundenNachname\}\}/g, customer?.lastName ?? "")
     .replace(/\{\{kundenFirma\}\}/g, customer?.companyName ?? "")
@@ -529,8 +528,12 @@ function resolvePlaceholders(template: string, doc: Document, company: CompanySe
     .replace(/\{\{firmenIban\}\}/g, company.bankIban ?? "")
     .replace(/\{\{firmenUstId\}\}/g, company.vatId ?? "")
     // Mitarbeiter
-    .replace(/\{\{mitarbeiterName\}\}/g, me?.fullName ?? "")
-    .replace(/\{\{mitarbeiterEmail\}\}/g, me?.email ?? "");
+    .replace(/\{\{mitarbeiterName\}\}/g, mitarbeiterName)
+    .replace(/\{\{mitarbeiterVorname\}\}/g, me?.firstName ?? "")
+    .replace(/\{\{mitarbeiterNachname\}\}/g, me?.lastName ?? "")
+    .replace(/\{\{mitarbeiterEmail\}\}/g, me?.email ?? "")
+    .replace(/\{\{mitarbeiterTelefon\}\}/g, me?.phone ?? "")
+    .replace(/\{\{mitarbeiterMobil\}\}/g, me?.mobile ?? "");
 }
 
 // ─── Send E-Mail Modal ────────────────────────────────────────────────────────
