@@ -287,13 +287,9 @@ function TotalsBlock({ doc, layout, s }: { doc: HBDocument; layout: DocumentLayo
   const globalDiscountPct = parseFloat(doc.globalDiscountPct ?? "0.00");
   const globalDiscountType = (doc.globalDiscountType ?? "pct") as "pct" | "abs";
   const hasGlobalDiscount = globalDiscountPct > 0;
-  const rawGross = rawNet + rawTax;
   const discountFactor = globalDiscountType === "abs"
-    ? (rawGross > 0 ? Math.max(0, rawGross - globalDiscountPct) / rawGross : 1)
+    ? (rawNet > 0 ? Math.max(0, rawNet - globalDiscountPct) / rawNet : 1)
     : 1 - globalDiscountPct / 100;
-  const globalDiscountLabel = globalDiscountType === "abs"
-    ? `Gesamtrabatt ${formatEur(String(globalDiscountPct))}`
-    : `Gesamtrabatt ${globalDiscountPct}%`;
 
   // Tax breakdown per rate.
   // For abs global discount: show RAW tax (before gross deduction) so that
@@ -311,13 +307,10 @@ function TotalsBlock({ doc, layout, s }: { doc: HBDocument; layout: DocumentLayo
   })();
 
   const taxBreakdown: { pct: string; amount: string }[] = (() => {
-    if (globalDiscountType === "abs") {
-      // Use raw tax; the abs discount is deducted separately at gross level
-      return taxBreakdownRaw.map(({ pct, amount }) => ({ pct, amount: amount.toFixed(2) }));
-    }
-    // pct discount: use finalized taxLines if available, else compute with discountFactor
+    // Use finalized taxLines if available (both pct and abs already applied discountFactor server-side)
     const tl = doc.taxLines ?? [];
     if (tl.length > 0) return tl.map((t) => ({ pct: t.taxRatePct, amount: t.taxAmount }));
+    // Draft: apply discountFactor to raw tax (works for both pct and abs since factor is net-based)
     return taxBreakdownRaw.map(({ pct, amount }) => ({ pct, amount: (amount * discountFactor).toFixed(2) }));
   })();
 
@@ -331,12 +324,18 @@ function TotalsBlock({ doc, layout, s }: { doc: HBDocument; layout: DocumentLayo
         </View>
       )}
 
-      {/* 2. Nettorabatt (nur bei %-Rabatt) */}
-      {hasGlobalDiscount && globalDiscountType === "pct" && (
+      {/* 2. Nettorabatt (% oder €) */}
+      {hasGlobalDiscount && (
         <View style={base.totalsRow}>
-          <Text style={[base.totalsLabel, { color: "#dc2626" }]}>Nettorabatt {globalDiscountPct}%</Text>
+          <Text style={[base.totalsLabel, { color: "#dc2626" }]}>
+            {globalDiscountType === "abs"
+              ? `Nettorabatt ${formatEur(String(globalDiscountPct))}`
+              : `Nettorabatt ${globalDiscountPct}%`}
+          </Text>
           <Text style={[base.totalsValue, { color: "#dc2626" }]}>
-            -{formatEur((rawNet * (globalDiscountPct / 100)).toFixed(2))}
+            -{globalDiscountType === "abs"
+              ? formatEur(String(Math.min(globalDiscountPct, rawNet)))
+              : formatEur((rawNet * (globalDiscountPct / 100)).toFixed(2))}
           </Text>
         </View>
       )}
@@ -348,18 +347,6 @@ function TotalsBlock({ doc, layout, s }: { doc: HBDocument; layout: DocumentLayo
           <Text style={base.totalsValue}>{formatEur(amount)}</Text>
         </View>
       ))}
-
-      {/* 4. Bruttorabatt (nur bei €-Rabatt) */}
-      {hasGlobalDiscount && globalDiscountType === "abs" && (
-        <View style={base.totalsRow}>
-          <Text style={[base.totalsLabel, { color: "#dc2626" }]}>
-            Bruttorabatt {formatEur(String(globalDiscountPct))}
-          </Text>
-          <Text style={[base.totalsValue, { color: "#dc2626" }]}>
-            -{formatEur(String(globalDiscountPct))}
-          </Text>
-        </View>
-      )}
 
       {/* 5. Gesamtsumme */}
       <View style={[base.totalGrossRow, { borderTopColor: s.accentColor }]}>
