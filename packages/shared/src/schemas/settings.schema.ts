@@ -86,6 +86,10 @@ export const SendDocumentEmailSchema = z.object({
 export const CreateUserSchema = z.object({
   email: z.string().email(),
   fullName: z.string().min(1).max(200),
+  firstName: z.string().max(100).nullable().optional(),
+  lastName: z.string().max(100).nullable().optional(),
+  phone: z.string().max(50).nullable().optional(),
+  mobile: z.string().max(50).nullable().optional(),
   role: z.enum(["admin", "accountant", "viewer"]).default("viewer"),
   password: z.string().min(8).max(200),
 });
@@ -93,6 +97,10 @@ export const CreateUserSchema = z.object({
 export const UpdateUserSchema = z.object({
   email: z.string().email().optional(),
   fullName: z.string().min(1).max(200).optional(),
+  firstName: z.string().max(100).nullable().optional(),
+  lastName: z.string().max(100).nullable().optional(),
+  phone: z.string().max(50).nullable().optional(),
+  mobile: z.string().max(50).nullable().optional(),
   role: z.enum(["admin", "accountant", "viewer"]).optional(),
   isActive: z.boolean().optional(),
   password: z.string().min(8).max(200).optional(),

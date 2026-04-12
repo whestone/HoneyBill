@@ -393,8 +393,12 @@ export const EMAIL_PLACEHOLDERS: { key: string; group: string; label: string; ex
   { key: "{{firmenIban}}", group: "Firma", label: "IBAN", example: "DE12 3456 7890 1234 5678 90" },
   { key: "{{firmenUstId}}", group: "Firma", label: "USt-IdNr. (Firma)", example: "DE987654321" },
   // Mitarbeiter
-  { key: "{{mitarbeiterName}}", group: "Mitarbeiter", label: "Name (Sachbearbeiter)", example: "Anna Schmidt" },
-  { key: "{{mitarbeiterEmail}}", group: "Mitarbeiter", label: "E-Mail (Sachbearbeiter)", example: "anna@firma.de" },
+  { key: "{{mitarbeiterName}}", group: "Mitarbeiter", label: "Vollständiger Name", example: "Anna Schmidt" },
+  { key: "{{mitarbeiterVorname}}", group: "Mitarbeiter", label: "Vorname", example: "Anna" },
+  { key: "{{mitarbeiterNachname}}", group: "Mitarbeiter", label: "Nachname", example: "Schmidt" },
+  { key: "{{mitarbeiterEmail}}", group: "Mitarbeiter", label: "E-Mail", example: "anna@firma.de" },
+  { key: "{{mitarbeiterTelefon}}", group: "Mitarbeiter", label: "Telefon (Festnetz)", example: "+49 30 12345678" },
+  { key: "{{mitarbeiterMobil}}", group: "Mitarbeiter", label: "Mobil", example: "+49 170 1234567" },
 ];
 
 export interface CompanySettings {
@@ -426,6 +430,10 @@ export interface User {
   id: number;
   email: string;
   fullName: string;
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
+  mobile: string | null;
   role: UserRole;
   isActive: boolean;
   lastLoginAt: string | null;

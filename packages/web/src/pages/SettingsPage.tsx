@@ -1091,7 +1091,11 @@ function UsersTab({ currentUserId }: { currentUserId: number }) {
             {userList.map((u) => (
               <tr key={u.id} className={`hover:bg-gray-50 transition-colors ${!u.isActive ? "opacity-50" : ""}`}>
                 <td className="px-4 py-3">
-                  <div className="font-medium text-gray-900">{u.fullName}</div>
+                  <div className="font-medium text-gray-900">
+                    {u.firstName || u.lastName
+                      ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim()
+                      : u.fullName}
+                  </div>
                   <div className="text-xs text-gray-400">{u.email}</div>
                 </td>
                 <td className="px-4 py-3">
@@ -1121,7 +1125,7 @@ function UsersTab({ currentUserId }: { currentUserId: number }) {
                     {u.id !== currentUserId && (
                       u.isActive ? (
                         <button
-                          onClick={() => { if (confirm(`${u.fullName} deaktivieren?`)) deactivate.mutate(u.id); }}
+                          onClick={() => { const name = u.firstName || u.lastName ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() : u.fullName; if (confirm(`${name} deaktivieren?`)) deactivate.mutate(u.id); }}
                           className="btn-danger text-xs py-1 px-2"
                         >
                           Deaktivieren
@@ -1172,7 +1176,10 @@ function UserFormModal({
   const isEdit = !!user;
   const [form, setForm] = useState({
     email: user?.email ?? "",
-    fullName: user?.fullName ?? "",
+    firstName: user?.firstName ?? "",
+    lastName: user?.lastName ?? "",
+    phone: user?.phone ?? "",
+    mobile: user?.mobile ?? "",
     role: (user?.role ?? "viewer") as UserRole,
     password: "",
     passwordConfirm: "",
@@ -1198,10 +1205,15 @@ function UserFormModal({
 
     setSaving(true);
     try {
+      const fullName = `${form.firstName} ${form.lastName}`.trim() || form.firstName || form.lastName || form.email;
       if (isEdit) {
         const patch: Record<string, unknown> = {
           email: form.email,
-          fullName: form.fullName,
+          fullName,
+          firstName: form.firstName || null,
+          lastName: form.lastName || null,
+          phone: form.phone || null,
+          mobile: form.mobile || null,
           role: form.role,
         };
         if (form.password) patch.password = form.password;
@@ -1209,7 +1221,11 @@ function UserFormModal({
       } else {
         await api.post("/users", {
           email: form.email,
-          fullName: form.fullName,
+          fullName,
+          firstName: form.firstName || null,
+          lastName: form.lastName || null,
+          phone: form.phone || null,
+          mobile: form.mobile || null,
           role: form.role,
           password: form.password,
         });
@@ -1235,14 +1251,43 @@ function UserFormModal({
             onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
           />
         </div>
-        <div>
-          <label className="label">Name</label>
-          <input
-            className="input"
-            required
-            value={form.fullName}
-            onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
-          />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Vorname</label>
+            <input
+              className="input"
+              value={form.firstName}
+              onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="label">Nachname</label>
+            <input
+              className="input"
+              value={form.lastName}
+              onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Telefon (Festnetz)</label>
+            <input
+              className="input"
+              type="tel"
+              value={form.phone}
+              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="label">Mobilnummer</label>
+            <input
+              className="input"
+              type="tel"
+              value={form.mobile}
+              onChange={(e) => setForm((f) => ({ ...f, mobile: e.target.value }))}
+            />
+          </div>
         </div>
         <div>
           <label className="label">Rolle</label>
