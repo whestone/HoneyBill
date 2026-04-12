@@ -12,24 +12,48 @@ interface SeriesRow {
   next_counter: number;
   last_reset_at: string | null;
   reset_yearly: number;
+  format: string | null;
 }
 
-/** Format a document number from series config + counter + date. */
-export function formatNumber(series: SeriesRow, counter: number, issueDate: string): string {
-  const year = issueDate.slice(0, 4);
+/**
+ * Format template variables:
+ *   {YYYY}  → 4-digit year
+ *   {YY}    → 2-digit year
+ *   {MM}    → 2-digit month
+ *   {N}, {NN}, ... → counter padded to N digits
+ */
+export function formatNumberFromTemplate(format: string, counter: number, issueDate: string): string {
+  const year4 = issueDate.slice(0, 4);
+  const year2 = issueDate.slice(2, 4);
   const month = issueDate.slice(5, 7);
-  const padded = String(counter).padStart(series.padding, "0");
 
+  // Replace counter placeholder: one or more N inside braces
+  const result = format
+    .replace(/\{YYYY\}/g, year4)
+    .replace(/\{YY\}/g, year2)
+    .replace(/\{MM\}/g, month)
+    .replace(/\{(N+)\}/g, (_match, ns: string) => String(counter).padStart(ns.length, "0"));
+
+  return result;
+}
+
+/** Build default format from legacy columns */
+function legacyFormat(series: SeriesRow): string {
+  const padStr = "N".repeat(series.padding || 5);
   let middle = "";
   if (series.year_segment && series.month_segment) {
-    middle = `${year}-${month}-`;
+    middle = "{YYYY}-{MM}-";
   } else if (series.year_segment) {
-    middle = `${year}-`;
+    middle = "{YYYY}-";
   } else if (series.month_segment) {
-    middle = `${month}-`;
+    middle = "{MM}-";
   }
+  return `${series.prefix}${middle}{${padStr}}${series.suffix}`;
+}
 
-  return `${series.prefix}${middle}${padded}${series.suffix}`;
+/** Resolve the effective format: use stored format if set, else derive from legacy columns */
+function effectiveFormat(series: SeriesRow): string {
+  return series.format?.trim() || legacyFormat(series);
 }
 
 /** Atomically assign the next document number. Must be called inside a transaction context. */
@@ -51,7 +75,8 @@ export function assignNextNumber(sqlite: BetterSQLite3, documentType: DocumentTy
       counter = 1;
     }
 
-    const docNumber = formatNumber(series, counter, issueDate);
+    const fmt = effectiveFormat(series);
+    const docNumber = formatNumberFromTemplate(fmt, counter, issueDate);
 
     sqlite
       .prepare(
@@ -64,7 +89,7 @@ export function assignNextNumber(sqlite: BetterSQLite3, documentType: DocumentTy
 }
 
 /** Preview the next number without consuming it. */
-export function previewNextNumber(sqlite: BetterSQLite3, documentType: DocumentType): string {
+export function previewNextNumber(sqlite: BetterSQLite3, documentType: DocumentType, format?: string): string {
   const series = sqlite
     .prepare<string, SeriesRow>("SELECT * FROM number_series WHERE document_type = ?")
     .get(documentType);
@@ -79,5 +104,11 @@ export function previewNextNumber(sqlite: BetterSQLite3, documentType: DocumentT
     counter = 1;
   }
 
-  return formatNumber(series, counter, today);
+  const fmt = format ?? effectiveFormat(series);
+  return formatNumberFromTemplate(fmt, counter, today);
+}
+
+/** Validate a format string: must contain at least one {N+} placeholder */
+export function validateFormat(format: string): boolean {
+  return /\{N+\}/.test(format);
 }

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
-import type { CompanySettings, TaxRate, PdfSettings, EmailSettings, DocumentType, DocumentLayoutSettings } from "@honeybill/shared";
+import type { CompanySettings, TaxRate, PdfSettings, EmailSettings, DocumentType, DocumentLayoutSettings, NumberSeries } from "@honeybill/shared";
 import {
   DEFAULT_PDF_SETTINGS, DEFAULT_LAYOUTS, UpdatePdfSettingsSchema, type UpdatePdfSettingsInput,
   DEFAULT_EMAIL_SETTINGS, UpdateEmailSettingsSchema, type UpdateEmailSettingsInput,
@@ -10,7 +10,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { UpdateCompanySettingsSchema, type UpdateCompanySettingsInput } from "@honeybill/shared";
 import { useEffect, useRef, useState, useMemo } from "react";
-import { Building2, CheckCircle, Percent, Plus, Trash2, FileText, Mail, Send, Eye, EyeOff, Users, ShieldCheck, UserCog, BadgeCheck } from "lucide-react";
+import { Building2, CheckCircle, Percent, Plus, Trash2, FileText, Mail, Send, Eye, EyeOff, Users, ShieldCheck, UserCog, BadgeCheck, Hash } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { usePDF } from "@react-pdf/renderer";
 import { InvoicePDF } from "@/components/pdf/InvoiceTemplate";
@@ -19,7 +19,7 @@ import { CreateUserSchema, UpdateUserSchema } from "@honeybill/shared";
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-const TAB_LABELS = { company: "Firmendaten", taxrates: "Steuersätze", pdflayout: "PDF-Layout", email: "E-Mail", users: "Benutzer" } as const;
+const TAB_LABELS = { company: "Firmendaten", taxrates: "Steuersätze", numbering: "Nummernkreise", pdflayout: "PDF-Layout", email: "E-Mail", users: "Benutzer" } as const;
 type Tab = keyof typeof TAB_LABELS;
 
 export function SettingsPage() {
@@ -57,6 +57,7 @@ export function SettingsPage() {
 
       {tab === "company" && <CompanyTab />}
       {tab === "taxrates" && <TaxRatesTab />}
+      {tab === "numbering" && <NumberSeriesTab />}
       {tab === "pdflayout" && <PdfLayoutTab />}
       {tab === "email" && <EmailTab />}
       {tab === "users" && isAdmin && <UsersTab currentUserId={me?.id ?? 0} />}
@@ -843,6 +844,7 @@ const TAX_CATEGORIES = [
 function TaxRatesTab() {
   const qc = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
+  const [editing, setEditing] = useState<TaxRate | null>(null);
 
   const { data: taxRates, isLoading } = useQuery<TaxRate[]>({
     queryKey: ["tax-rates"],
@@ -897,13 +899,22 @@ function TaxRatesTab() {
                     )}
                   </td>
                   <td className="table-cell">
-                    <button
-                      onClick={() => deleteTaxRate.mutate(tr.id)}
-                      className="text-gray-300 hover:text-red-500 transition-colors p-1"
-                      title="Löschen"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setEditing(tr)}
+                        className="text-gray-300 hover:text-honey-600 transition-colors p-1"
+                        title="Bearbeiten"
+                      >
+                        <FileText size={14} />
+                      </button>
+                      <button
+                        onClick={() => { if (confirm(`Steuersatz "${tr.name}" löschen?`)) deleteTaxRate.mutate(tr.id); }}
+                        className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                        title="Löschen"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -920,6 +931,7 @@ function TaxRatesTab() {
       </div>
 
       <CreateTaxRateModal open={showCreate} onClose={() => setShowCreate(false)} />
+      {editing && <CreateTaxRateModal open onClose={() => setEditing(null)} existing={editing} />}
     </div>
   );
 }
@@ -935,28 +947,29 @@ interface TaxRateForm {
   isDefault: boolean;
 }
 
-function CreateTaxRateModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function CreateTaxRateModal({ open, onClose, existing }: { open: boolean; onClose: () => void; existing?: TaxRate }) {
   const qc = useQueryClient();
+  const isEdit = !!existing;
   const [form, setForm] = useState<TaxRateForm>({
-    name: "",
-    ratePercent: "19.00",
-    taxCategory: "S",
-    validFrom: new Date().toISOString().slice(0, 10),
-    validTo: "",
-    isDefault: false,
+    name: existing?.name ?? "",
+    ratePercent: existing?.ratePercent ?? "19.00",
+    taxCategory: existing?.taxCategory ?? "S",
+    validFrom: existing?.validFrom ?? new Date().toISOString().slice(0, 10),
+    validTo: existing?.validTo ?? "",
+    isDefault: existing?.isDefault ?? false,
   });
   const [error, setError] = useState("");
 
-  const create = useMutation({
-    mutationFn: (data: TaxRateForm) =>
-      api.post("/tax-rates", {
-        ...data,
-        validTo: data.validTo || null,
-      }),
+  const save = useMutation({
+    mutationFn: (data: TaxRateForm) => {
+      const payload = { ...data, validTo: data.validTo || null };
+      return isEdit
+        ? api.put(`/tax-rates/${existing!.id}`, payload)
+        : api.post("/tax-rates", payload);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tax-rates"] });
       onClose();
-      setForm({ name: "", ratePercent: "19.00", taxCategory: "S", validFrom: new Date().toISOString().slice(0, 10), validTo: "", isDefault: false });
       setError("");
     },
     onError: (e: Error) => setError(e.message),
@@ -969,9 +982,9 @@ function CreateTaxRateModal({ open, onClose }: { open: boolean; onClose: () => v
   });
 
   return (
-    <Modal open={open} onClose={onClose} title="Neuer Steuersatz">
+    <Modal open={open} onClose={onClose} title={isEdit ? "Steuersatz bearbeiten" : "Neuer Steuersatz"}>
       <form
-        onSubmit={(e) => { e.preventDefault(); create.mutate(form); }}
+        onSubmit={(e) => { e.preventDefault(); save.mutate(form); }}
         className="space-y-4"
       >
         <div className="grid grid-cols-2 gap-4">
@@ -1020,9 +1033,9 @@ function CreateTaxRateModal({ open, onClose }: { open: boolean; onClose: () => v
         {error && <p className="text-red-500 text-sm">{error}</p>}
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="btn-secondary">Abbrechen</button>
-          <button type="submit" disabled={create.isPending} className="btn-primary">
+          <button type="submit" disabled={save.isPending} className="btn-primary">
             <Percent size={14} />
-            {create.isPending ? "Speichern…" : "Speichern"}
+            {save.isPending ? "Speichern…" : "Speichern"}
           </button>
         </div>
       </form>
@@ -1037,6 +1050,174 @@ const ROLE_LABELS: Record<UserRole, string> = {
   accountant: "Buchhalter",
   viewer: "Betrachter",
 };
+
+// ─── Number Series Tab ────────────────────────────────────────────────────────
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  INVOICE: "Rechnung",
+  QUOTE: "Angebot",
+  DELIVERY_NOTE: "Lieferschein",
+  CREDIT_NOTE: "Gutschrift",
+};
+
+const FORMAT_VARS = [
+  { key: "{YYYY}", label: "Vierstelliges Jahr", example: "2026" },
+  { key: "{YY}", label: "Zweistelliges Jahr", example: "26" },
+  { key: "{MM}", label: "Monat", example: "04" },
+  { key: "{NNNNN}", label: "Zähler (5 Stellen)", example: "00001" },
+  { key: "{NNN}", label: "Zähler (3 Stellen)", example: "001" },
+  { key: "{N}", label: "Zähler (keine Auffüllung)", example: "1" },
+];
+
+function NumberSeriesTab() {
+  const qc = useQueryClient();
+  const { data: series = [], isLoading } = useQuery<NumberSeries[]>({
+    queryKey: ["number-series"],
+    queryFn: () => api.get("/number-series"),
+  });
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-500">
+        Legen Sie das Format für Belegnummern fest. Verwenden Sie Variablen wie <code className="font-mono text-xs bg-gray-100 px-1 rounded">{"{YYYY}"}</code>, <code className="font-mono text-xs bg-gray-100 px-1 rounded">{"{MM}"}</code> und <code className="font-mono text-xs bg-gray-100 px-1 rounded">{"{NNNNN}"}</code> (Anzahl N = Stellen mit führenden Nullen).
+      </p>
+      {isLoading ? (
+        <div className="p-8 text-center text-gray-400">Laden…</div>
+      ) : (
+        <div className="space-y-4">
+          {series.map((s) => (
+            <NumberSeriesCard key={s.documentType} series={s} onSaved={() => qc.invalidateQueries({ queryKey: ["number-series"] })} />
+          ))}
+        </div>
+      )}
+      {/* Variable reference */}
+      <div className="card p-4">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Verfügbare Variablen</p>
+        <div className="grid grid-cols-2 gap-2">
+          {FORMAT_VARS.map((v) => (
+            <div key={v.key} className="flex items-center gap-3">
+              <code className="font-mono text-xs text-honey-700 bg-honey-50 px-2 py-0.5 rounded min-w-[80px]">{v.key}</code>
+              <span className="text-xs text-gray-500">{v.label} <span className="text-gray-400">({v.example})</span></span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NumberSeriesCard({ series, onSaved }: { series: NumberSeries; onSaved: () => void }) {
+  const defaultFormat = (() => {
+    if (series.format) return series.format;
+    const padStr = "N".repeat(series.padding || 5);
+    let mid = "";
+    if (series.yearSegment && series.monthSegment) mid = "{YYYY}-{MM}-";
+    else if (series.yearSegment) mid = "{YYYY}-";
+    else if (series.monthSegment) mid = "{MM}-";
+    return `${series.prefix}${mid}{${padStr}}${series.suffix}`;
+  })();
+
+  const [format, setFormat] = useState(defaultFormat);
+  const [nextCounter, setNextCounter] = useState(String(series.nextCounter));
+  const [resetYearly, setResetYearly] = useState(series.resetYearly);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+
+  const hasNPlaceholder = /\{N+\}/.test(format);
+
+  const fetchPreview = async (fmt: string) => {
+    try {
+      const res = await api.post(`/number-series/${series.documentType}/preview`, { format: fmt });
+      setPreview((res as any).preview);
+    } catch {
+      setPreview(null);
+    }
+  };
+
+  const handleFormatChange = (val: string) => {
+    setFormat(val);
+    if (/\{N+\}/.test(val)) fetchPreview(val);
+    else setPreview(null);
+  };
+
+  const handleSave = async () => {
+    if (!hasNPlaceholder) { setError("Format muss mindestens einen Zähler-Platzhalter enthalten (z.B. {NNNNN})"); return; }
+    setError("");
+    setSaving(true);
+    try {
+      await api.put(`/number-series/${series.documentType}`, {
+        format,
+        nextCounter: Number(nextCounter),
+        resetYearly,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      onSaved();
+    } catch (e: any) {
+      setError(e?.message ?? "Fehler beim Speichern");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="card p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <Hash size={16} className="text-honey-500" />
+        <h3 className="font-semibold text-gray-900">{DOC_TYPE_LABELS[series.documentType] ?? series.documentType}</h3>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="col-span-2">
+          <label className="label">Format</label>
+          <input
+            className={`input font-mono ${!hasNPlaceholder && format ? "border-red-300 bg-red-50" : ""}`}
+            value={format}
+            onChange={(e) => handleFormatChange(e.target.value)}
+            placeholder="z.B. RE-{YYYY}-{NNNNN}"
+          />
+          {preview && (
+            <p className="text-xs text-gray-500 mt-1">
+              Vorschau: <span className="font-mono font-semibold text-honey-700">{preview}</span>
+            </p>
+          )}
+          {!hasNPlaceholder && format && (
+            <p className="text-xs text-red-500 mt-1">Kein Zähler-Platzhalter gefunden (z.B. {"{NNNNN}"})</p>
+          )}
+        </div>
+        <div>
+          <label className="label">Nächste Nummer</label>
+          <input
+            className="input"
+            type="number"
+            min={1}
+            value={nextCounter}
+            onChange={(e) => setNextCounter(e.target.value)}
+          />
+        </div>
+        <div className="flex items-end pb-1">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={resetYearly}
+              onChange={(e) => setResetYearly(e.target.checked)}
+              className="rounded"
+            />
+            <span className="text-sm text-gray-700">Jährlich zurücksetzen</span>
+          </label>
+        </div>
+      </div>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="flex items-center gap-3">
+        <button onClick={handleSave} disabled={saving || !hasNPlaceholder} className="btn-primary">
+          {saving ? "Speichern…" : "Speichern"}
+        </button>
+        {saved && <span className="flex items-center gap-1 text-green-600 text-sm"><CheckCircle size={14} /> Gespeichert</span>}
+      </div>
+    </div>
+  );
+}
 
 const ROLE_ICONS: Record<UserRole, React.ReactNode> = {
   admin: <ShieldCheck size={13} className="text-red-500" />,
