@@ -362,15 +362,39 @@ export const DEFAULT_EMAIL_SETTINGS: EmailSettings = {
     "Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie {{dokumentTyp}} {{dokumentNummer}} über {{betrag}}.\n\n{{zahlungshinweis}}\n\nMit freundlichen Grüßen\n{{firmenName}}",
 };
 
-export const EMAIL_PLACEHOLDERS: { key: string; label: string; example: string }[] = [
-  { key: "{{anrede}}", label: "Anrede", example: "Sehr geehrter Herr Mustermann," },
-  { key: "{{kundenName}}", label: "Kundenname", example: "Max Mustermann" },
-  { key: "{{dokumentNummer}}", label: "Belegnummer", example: "RE-2026-00001" },
-  { key: "{{dokumentTyp}}", label: "Belegtyp", example: "Rechnung" },
-  { key: "{{betrag}}", label: "Gesamtbetrag", example: "1.190,00 €" },
-  { key: "{{faelligkeitsDatum}}", label: "Fälligkeitsdatum", example: "25.04.2026" },
-  { key: "{{firmenName}}", label: "Firmenname", example: "Meine Firma GmbH" },
-  { key: "{{zahlungshinweis}}", label: "Zahlungshinweis (auto)", example: "Bitte überweisen Sie den Betrag bis zum…" },
+export const EMAIL_PLACEHOLDERS: { key: string; group: string; label: string; example: string }[] = [
+  // Dokument
+  { key: "{{dokumentNummer}}", group: "Dokument", label: "Belegnummer", example: "RE-2026-00001" },
+  { key: "{{dokumentTyp}}", group: "Dokument", label: "Belegtyp", example: "Rechnung" },
+  { key: "{{ausstellungsDatum}}", group: "Dokument", label: "Ausstellungsdatum", example: "10.04.2026" },
+  { key: "{{faelligkeitsDatum}}", group: "Dokument", label: "Fälligkeitsdatum", example: "25.04.2026" },
+  { key: "{{nettobetrag}}", group: "Dokument", label: "Nettobetrag", example: "1.000,00 €" },
+  { key: "{{betrag}}", group: "Dokument", label: "Gesamtbetrag (brutto)", example: "1.190,00 €" },
+  { key: "{{zahlungshinweis}}", group: "Dokument", label: "Zahlungshinweis (auto)", example: "Bitte überweisen Sie…" },
+  // Kunde
+  { key: "{{anrede}}", group: "Kunde", label: "Anrede (formell)", example: "Sehr geehrter Herr Mustermann," },
+  { key: "{{kundenName}}", group: "Kunde", label: "Kundenname (Firma oder Vor+Nachname)", example: "Max Mustermann" },
+  { key: "{{kundenVorname}}", group: "Kunde", label: "Vorname", example: "Max" },
+  { key: "{{kundenNachname}}", group: "Kunde", label: "Nachname", example: "Mustermann" },
+  { key: "{{kundenFirma}}", group: "Kunde", label: "Firmenname (Kunde)", example: "Mustermann GmbH" },
+  { key: "{{kundenEmail}}", group: "Kunde", label: "E-Mail (Kunde)", example: "max@mustermann.de" },
+  { key: "{{kundenTelefon}}", group: "Kunde", label: "Telefon (Kunde)", example: "+49 30 12345678" },
+  { key: "{{kundenStrasse}}", group: "Kunde", label: "Straße (Rechnungsadresse)", example: "Musterstraße 1" },
+  { key: "{{kundenPlz}}", group: "Kunde", label: "PLZ", example: "10115" },
+  { key: "{{kundenOrt}}", group: "Kunde", label: "Ort", example: "Berlin" },
+  { key: "{{kundenUstId}}", group: "Kunde", label: "USt-IdNr.", example: "DE123456789" },
+  // Firma
+  { key: "{{firmenName}}", group: "Firma", label: "Firmenname", example: "Meine Firma GmbH" },
+  { key: "{{firmenStrasse}}", group: "Firma", label: "Straße (Firma)", example: "Hauptstraße 1" },
+  { key: "{{firmenPlz}}", group: "Firma", label: "PLZ (Firma)", example: "10115" },
+  { key: "{{firmenOrt}}", group: "Firma", label: "Ort (Firma)", example: "Berlin" },
+  { key: "{{firmenEmail}}", group: "Firma", label: "E-Mail (Firma)", example: "info@meinefirma.de" },
+  { key: "{{firmenTelefon}}", group: "Firma", label: "Telefon (Firma)", example: "+49 30 987654" },
+  { key: "{{firmenIban}}", group: "Firma", label: "IBAN", example: "DE12 3456 7890 1234 5678 90" },
+  { key: "{{firmenUstId}}", group: "Firma", label: "USt-IdNr. (Firma)", example: "DE987654321" },
+  // Mitarbeiter
+  { key: "{{mitarbeiterName}}", group: "Mitarbeiter", label: "Name (Sachbearbeiter)", example: "Anna Schmidt" },
+  { key: "{{mitarbeiterEmail}}", group: "Mitarbeiter", label: "E-Mail (Sachbearbeiter)", example: "anna@firma.de" },
 ];
 
 export interface CompanySettings {
