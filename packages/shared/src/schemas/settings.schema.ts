@@ -83,8 +83,24 @@ export const SendDocumentEmailSchema = z.object({
   attachPdf: z.boolean().default(true),
 });
 
+export const CreateUserSchema = z.object({
+  email: z.string().email(),
+  fullName: z.string().min(1).max(200),
+  role: z.enum(["admin", "accountant", "viewer"]).default("viewer"),
+  password: z.string().min(8).max(200),
+});
+
+export const UpdateUserSchema = z.object({
+  fullName: z.string().min(1).max(200).optional(),
+  role: z.enum(["admin", "accountant", "viewer"]).optional(),
+  isActive: z.boolean().optional(),
+  password: z.string().min(8).max(200).optional(),
+});
+
 export type UpdateCompanySettingsInput = z.infer<typeof UpdateCompanySettingsSchema>;
 export type UpdateNumberSeriesInput = z.infer<typeof UpdateNumberSeriesSchema>;
 export type UpdatePdfSettingsInput = z.infer<typeof UpdatePdfSettingsSchema>;
 export type UpdateEmailSettingsInput = z.infer<typeof UpdateEmailSettingsSchema>;
 export type SendDocumentEmailInput = z.infer<typeof SendDocumentEmailSchema>;
+export type CreateUserInput = z.infer<typeof CreateUserSchema>;
+export type UpdateUserInput = z.infer<typeof UpdateUserSchema>;

@@ -14,6 +14,7 @@ import { documentRoutes } from "./routes/documents.js";
 import { settingsRoutes, taxRateRoutes, numberSeriesRoutes } from "./routes/settings.js";
 import { openItemsRoutes } from "./routes/open-items.js";
 import { auditLogRoutes } from "./routes/audit-log.js";
+import { userRoutes } from "./routes/users.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -61,6 +62,7 @@ await app.register(taxRateRoutes, { prefix: "/api/v1/tax-rates" });
 await app.register(numberSeriesRoutes, { prefix: "/api/v1/number-series" });
 await app.register(openItemsRoutes, { prefix: "/api/v1/open-items" });
 await app.register(auditLogRoutes, { prefix: "/api/v1/audit-log" });
+await app.register(userRoutes, { prefix: "/api/v1/users" });
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
 
