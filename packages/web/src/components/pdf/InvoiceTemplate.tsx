@@ -294,6 +294,22 @@ function TotalsBlock({ doc, layout, s }: { doc: HBDocument; layout: DocumentLayo
     ? `Gesamtrabatt ${formatEur(String(globalDiscountPct))}`
     : `Gesamtrabatt ${globalDiscountPct}%`;
 
+  // Tax breakdown: use finalized taxLines if available, otherwise compute from line items
+  const taxBreakdown: { pct: string; amount: string }[] = (() => {
+    const tl = doc.taxLines ?? [];
+    if (tl.length > 0) {
+      return tl.map((t) => ({ pct: t.taxRatePct, amount: t.taxAmount }));
+    }
+    const map = new Map<string, number>();
+    for (const li of lines.filter((l) => l.lineType === "ITEM")) {
+      const pct = li.taxRatePct ?? "0.00";
+      map.set(pct, (map.get(pct) ?? 0) + parseFloat(li.lineTax) * discountFactor);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => parseFloat(a[0]) - parseFloat(b[0]))
+      .map(([pct, amount]) => ({ pct, amount: amount.toFixed(2) }));
+  })();
+
   return (
     <View style={base.totalsBlock}>
       {showGross && hasLineDiscount && !hasGlobalDiscount && (
@@ -315,7 +331,7 @@ function TotalsBlock({ doc, layout, s }: { doc: HBDocument; layout: DocumentLayo
             <Text style={base.totalsValue}>{formatEur(rawNet.toFixed(2))}</Text>
           </View>
           <View style={base.totalsRow}>
-            <Text style={[base.totalsLabel, { color: "#dc2626" }]}>Gesamtrabatt {globalDiscountPct}%</Text>
+            <Text style={[base.totalsLabel, { color: "#dc2626" }]}>{globalDiscountLabel}</Text>
             <Text style={[base.totalsValue, { color: "#dc2626" }]}>-{formatEur((rawNet - rawNet * discountFactor).toFixed(2))}</Text>
           </View>
         </>
@@ -327,7 +343,7 @@ function TotalsBlock({ doc, layout, s }: { doc: HBDocument; layout: DocumentLayo
             <Text style={base.totalsValue}>{formatEur((rawNet + rawTax).toFixed(2))}</Text>
           </View>
           <View style={base.totalsRow}>
-            <Text style={[base.totalsLabel, { color: "#dc2626" }]}>Gesamtrabatt {globalDiscountPct}%</Text>
+            <Text style={[base.totalsLabel, { color: "#dc2626" }]}>{globalDiscountLabel}</Text>
             <Text style={[base.totalsValue, { color: "#dc2626" }]}>-{formatEur(((rawNet + rawTax) - (rawNet + rawTax) * discountFactor).toFixed(2))}</Text>
           </View>
         </>
@@ -338,10 +354,10 @@ function TotalsBlock({ doc, layout, s }: { doc: HBDocument; layout: DocumentLayo
           <Text style={base.totalsValue}>{formatEur(doc.subtotalNet)}</Text>
         </View>
       )}
-      {(showNet || showGross) && (doc.taxLines ?? []).map((tl) => (
-        <View key={tl.id} style={base.totalsRow}>
-          <Text style={base.totalsLabel}>USt. {tl.taxRatePct}%</Text>
-          <Text style={base.totalsValue}>{formatEur(tl.taxAmount)}</Text>
+      {(showNet || showGross) && taxBreakdown.map(({ pct, amount }) => (
+        <View key={pct} style={base.totalsRow}>
+          <Text style={base.totalsLabel}>USt. {pct}%</Text>
+          <Text style={base.totalsValue}>{formatEur(amount)}</Text>
         </View>
       ))}
       <View style={[base.totalGrossRow, { borderTopColor: s.accentColor }]}>
