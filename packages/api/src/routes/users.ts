@@ -61,7 +61,14 @@ export async function userRoutes(app: FastifyInstance) {
       return reply.status(400).send({ message: "Sie können sich nicht selbst deaktivieren" });
     }
 
+    // Check email uniqueness if changing
+    if (input.email !== undefined && input.email !== user.email) {
+      const conflict = await db.query.users.findFirst({ where: eq(users.email, input.email) });
+      if (conflict) return reply.status(409).send({ message: "E-Mail-Adresse bereits vergeben" });
+    }
+
     const updateData: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+    if (input.email !== undefined) updateData.email = input.email;
     if (input.fullName !== undefined) updateData.fullName = input.fullName;
     if (input.role !== undefined) updateData.role = input.role;
     if (input.isActive !== undefined) updateData.isActive = input.isActive;
