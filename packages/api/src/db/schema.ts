@@ -285,6 +285,11 @@ export const documentsRelations = relations(documents, ({ one, many }) => ({
     fields: [documents.customerId],
     references: [customers.id],
   }),
+  cancelsDocument: one(documents, {
+    fields: [documents.cancelsDocumentId],
+    references: [documents.id],
+    relationName: "cancellation",
+  }),
   lineItems: many(documentLineItems),
   taxLines: many(documentTaxLines),
   payments: many(payments),

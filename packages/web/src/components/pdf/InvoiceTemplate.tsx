@@ -130,6 +130,21 @@ export function InvoicePDF({ doc, company }: InvoicePDFProps) {
           {doc.deliveryDate && <Text>Leistungsdatum: {formatDate(doc.deliveryDate)}{doc.deliveryDateEnd ? ` – ${formatDate(doc.deliveryDateEnd)}` : ""}</Text>}
         </View>
 
+        {/* Original invoice reference for credit notes / cancellations */}
+        {doc.documentType === "CREDIT_NOTE" && (() => {
+          const orig = (doc as any).cancelsDocument as { documentNumber?: string; issueDate?: string } | null;
+          if (!orig?.documentNumber) return null;
+          return (
+            <View style={{ backgroundColor: "#fef3c7", borderRadius: 4, padding: 8, marginBottom: 12 }}>
+              <Text style={{ fontSize: 8, color: "#92400e" }}>
+                {"Bezieht sich auf Rechnung Nr. "}
+                <Text style={{ fontFamily: "Helvetica-Bold" }}>{orig.documentNumber}</Text>
+                {orig.issueDate ? ` vom ${formatDate(orig.issueDate)}` : ""}
+              </Text>
+            </View>
+          );
+        })()}
+
         {/* Addresses */}
         <View style={base.addressRow}>
           <View style={base.addressBlock}>

@@ -114,6 +114,7 @@ export async function documentRoutes(app: FastifyInstance) {
         lineItems: { orderBy: [documentLineItems.position] },
         taxLines: true,
         payments: { orderBy: [desc(payments.paymentDate)] },
+        cancelsDocument: true,
       },
     });
     if (!doc) return reply.status(404).send({ message: "Beleg nicht gefunden" });
@@ -160,11 +161,54 @@ export async function documentRoutes(app: FastifyInstance) {
   });
 
   // POST /api/v1/documents/:id/cancel
+  // Creates an auto-finalized Stornorechnung (CREDIT_NOTE with negative amounts), then cancels the original.
   app.post("/:id/cancel", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    const payload = req.user as { sub: string };
-    await cancelDocument(db, Number(id), Number(payload.sub));
-    return reply.send({ ok: true });
+    const userId = Number((req.user as { sub: string }).sub);
+
+    const source = await db.query.documents.findFirst({
+      where: eq(documents.id, Number(id)),
+      with: { lineItems: true },
+    });
+    if (!source) return reply.status(404).send({ message: "Beleg nicht gefunden" });
+    if (!["FINAL", "SENT", "PARTIAL"].includes(source.status)) {
+      return reply.status(409).send({ message: "Nur finalisierte Belege können storniert werden" });
+    }
+
+    // Create Stornorechnung as CREDIT_NOTE with negated prices
+    const storno = await createDocument(
+      db,
+      {
+        documentType: "CREDIT_NOTE",
+        customerId: source.customerId,
+        cancelsDocumentId: source.id,
+        currency: source.currency,
+        globalDiscountPct: source.globalDiscountPct ?? "0.00",
+        lineItems: (source.lineItems ?? []).map((li) => ({
+          position: li.position,
+          lineType: li.lineType as "ITEM" | "TEXT" | "SUBTOTAL" | "PAGEBREAK",
+          productId: li.productId ?? undefined,
+          description: li.description,
+          quantity: li.quantity,
+          unit: li.unit,
+          // Negate the unit price to reverse the original
+          unitPrice: li.lineType === "ITEM"
+            ? (li.unitPrice.startsWith("-") ? li.unitPrice : `-${li.unitPrice}`)
+            : li.unitPrice,
+          discountPct: li.discountPct,
+          taxRateId: li.taxRateId ?? undefined,
+        })),
+      },
+      userId
+    );
+
+    // Auto-finalize the Stornorechnung
+    await finalizeDocument(db, storno.id, userId);
+
+    // Cancel the original document
+    await cancelDocument(db, Number(id), userId);
+
+    return reply.send({ ok: true, stornoId: storno.id });
   });
 
   // POST /api/v1/documents/:id/convert-to-invoice
@@ -232,7 +276,10 @@ export async function documentRoutes(app: FastifyInstance) {
           description: li.description,
           quantity: li.quantity,
           unit: li.unit,
-          unitPrice: li.unitPrice,
+          // Negate unit price so the Gutschrift reverses the original amounts
+          unitPrice: li.lineType === "ITEM"
+            ? (li.unitPrice.startsWith("-") ? li.unitPrice : `-${li.unitPrice}`)
+            : li.unitPrice,
           discountPct: li.discountPct,
           taxRateId: li.taxRateId ?? undefined,
         })),

@@ -199,8 +199,9 @@ export function DocumentDetailPage() {
             {canCancel && (
               <button
                 onClick={() => {
-                  if (!confirm("Beleg wirklich stornieren?")) return;
+                  if (!confirm("Beleg wirklich stornieren? Es wird automatisch eine Stornorechnung erstellt.")) return;
                   cancel.mutate(doc.id, {
+                    onSuccess: (res) => navigate({ to: "/documents/$id", params: { id: String(res.stornoId) } }),
                     onError: (e: any) => setActionError(e?.message ?? "Fehler beim Stornieren"),
                   });
                 }}
@@ -235,7 +236,7 @@ export function DocumentDetailPage() {
                 <div>
                   <div className="text-gray-500 text-xs mb-1">Storniert Beleg</div>
                   <Link to="/documents/$id" params={{ id: String(doc.cancelsDocumentId) }} className="text-honey-600 hover:underline">
-                    #{doc.cancelsDocumentId}
+                    {(doc as any).cancelsDocument?.documentNumber ?? `#${doc.cancelsDocumentId}`}
                   </Link>
                 </div>
               )}
