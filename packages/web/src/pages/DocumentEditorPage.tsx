@@ -142,16 +142,14 @@ export function DocumentEditorPage() {
   const rawTotalTax = rows
     .reduce((acc, r) => acc.plus(new Decimal(r.lineTax)), new Decimal(0));
 
-  const rawTotalGross = rawSubtotalNet.plus(rawTotalTax);
   const gDiscount = new Decimal(globalDiscountPct || "0");
   const hasGlobalDiscount = gDiscount.greaterThan(0);
   let discountFactor: Decimal;
   let globalDiscountDisplay: Decimal; // amount shown as "discount" in sidebar
   if (globalDiscountType === "abs") {
-    // abs discount reduces the gross directly
-    const absAmt = Decimal.min(gDiscount, rawTotalGross);
+    const absAmt = Decimal.min(gDiscount, rawSubtotalNet);
     globalDiscountDisplay = absAmt;
-    discountFactor = rawTotalGross.isZero() ? new Decimal(1) : rawTotalGross.minus(absAmt).div(rawTotalGross);
+    discountFactor = rawSubtotalNet.isZero() ? new Decimal(1) : rawSubtotalNet.minus(absAmt).div(rawSubtotalNet);
   } else {
     discountFactor = new Decimal(1).minus(gDiscount.div(100));
     globalDiscountDisplay = rawSubtotalNet.minus(rawSubtotalNet.mul(discountFactor).toDecimalPlaces(2, Decimal.ROUND_HALF_UP));

@@ -168,13 +168,10 @@ export async function finalizeDocument(db: DB, docId: number, userId: number | n
   const globalDiscountVal = new Decimal(doc.globalDiscountPct ?? "0.00");
   const globalDiscountType = doc.globalDiscountType ?? "pct";
   const rawSubtotal = updatedLineItems.reduce((acc: Decimal, li: any) => acc.plus(new Decimal(li.lineNet)), new Decimal(0));
-  const rawSubtotalTax = updatedLineItems.reduce((acc: Decimal, li: any) => acc.plus(new Decimal(li.lineTax)), new Decimal(0));
-  const rawSubtotalGross = rawSubtotal.plus(rawSubtotalTax);
   let discountFactor: Decimal;
   if (globalDiscountType === "abs") {
-    // abs discount reduces the gross total directly
-    const absAmt = Decimal.min(globalDiscountVal, rawSubtotalGross);
-    discountFactor = rawSubtotalGross.isZero() ? new Decimal(1) : rawSubtotalGross.minus(absAmt).div(rawSubtotalGross);
+    const absAmt = Decimal.min(globalDiscountVal, rawSubtotal);
+    discountFactor = rawSubtotal.isZero() ? new Decimal(1) : rawSubtotal.minus(absAmt).div(rawSubtotal);
   } else {
     discountFactor = new Decimal(1).minus(globalDiscountVal.div(100));
   }
@@ -403,13 +400,11 @@ async function recalcTotals(db: DB, docId: number) {
 
   const rawNet = lines.reduce((acc, li) => acc.plus(new Decimal(li.lineNet)), new Decimal(0));
   const rawTax = lines.reduce((acc, li) => acc.plus(new Decimal(li.lineTax)), new Decimal(0));
-  const rawGross = rawNet.plus(rawTax);
 
   let discountFactor: Decimal;
   if (globalDiscountType === "abs") {
-    // abs discount reduces the gross total directly
-    const absAmt = Decimal.min(globalDiscountVal, rawGross);
-    discountFactor = rawGross.isZero() ? new Decimal(1) : rawGross.minus(absAmt).div(rawGross);
+    const absAmt = Decimal.min(globalDiscountVal, rawNet);
+    discountFactor = rawNet.isZero() ? new Decimal(1) : rawNet.minus(absAmt).div(rawNet);
   } else {
     discountFactor = new Decimal(1).minus(globalDiscountVal.div(100));
   }
