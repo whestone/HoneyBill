@@ -10,7 +10,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { UpdateCompanySettingsSchema, type UpdateCompanySettingsInput } from "@honeybill/shared";
 import { useEffect, useRef, useState, useMemo } from "react";
-import { Building2, CheckCircle, Percent, Plus, Trash2, FileText, Mail, Send, Eye, EyeOff, Users, ShieldCheck, UserCog, BadgeCheck, Hash } from "lucide-react";
+import { Building2, CheckCircle, Percent, Plus, Trash2, FileText, Mail, Send, Eye, EyeOff, Users, ShieldCheck, UserCog, BadgeCheck, Hash, History } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { usePDF } from "@react-pdf/renderer";
 import { InvoicePDF } from "@/components/pdf/InvoiceTemplate";
@@ -845,6 +845,7 @@ function TaxRatesTab() {
   const qc = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<TaxRate | null>(null);
+  const [successor, setSuccessor] = useState<Partial<TaxRateForm> | null>(null);
 
   const { data: taxRates, isLoading } = useQuery<TaxRate[]>({
     queryKey: ["tax-rates"],
@@ -887,7 +888,7 @@ function TaxRatesTab() {
               {(taxRates ?? []).map((tr) => (
                 <tr key={tr.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="table-cell font-medium">{tr.name}</td>
-                  <td className="table-cell text-right font-mono">{tr.ratePercent} %</td>
+                  <td className="table-cell text-right font-mono">{parseFloat(tr.ratePercent).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} %</td>
                   <td className="table-cell text-gray-500 text-xs">{tr.taxCategory}</td>
                   <td className="table-cell text-gray-500 text-xs">{tr.validFrom}</td>
                   <td className="table-cell text-gray-500 text-xs">{tr.validTo ?? "—"}</td>
@@ -906,6 +907,20 @@ function TaxRatesTab() {
                         title="Bearbeiten"
                       >
                         <FileText size={14} />
+                      </button>
+                      <button
+                        onClick={() => setSuccessor({
+                          name: tr.name,
+                          taxCategory: tr.taxCategory,
+                          ratePercent: tr.ratePercent,
+                          validFrom: new Date().toISOString().slice(0, 10),
+                          validTo: "",
+                          isDefault: tr.isDefault,
+                        })}
+                        className="text-gray-300 hover:text-blue-500 transition-colors p-1"
+                        title="Nachfolger erstellen (neue Periode)"
+                      >
+                        <History size={14} />
                       </button>
                       <button
                         onClick={() => { if (confirm(`Steuersatz "${tr.name}" löschen?`)) deleteTaxRate.mutate(tr.id); }}
@@ -932,6 +947,7 @@ function TaxRatesTab() {
 
       <CreateTaxRateModal open={showCreate} onClose={() => setShowCreate(false)} />
       {editing && <CreateTaxRateModal open onClose={() => setEditing(null)} existing={editing} />}
+      {successor && <CreateTaxRateModal open onClose={() => setSuccessor(null)} initialValues={successor} />}
     </div>
   );
 }
@@ -947,16 +963,18 @@ interface TaxRateForm {
   isDefault: boolean;
 }
 
-function CreateTaxRateModal({ open, onClose, existing }: { open: boolean; onClose: () => void; existing?: TaxRate }) {
+function CreateTaxRateModal({ open, onClose, existing, initialValues }: {
+  open: boolean; onClose: () => void; existing?: TaxRate; initialValues?: Partial<TaxRateForm>;
+}) {
   const qc = useQueryClient();
   const isEdit = !!existing;
   const [form, setForm] = useState<TaxRateForm>({
-    name: existing?.name ?? "",
-    ratePercent: existing?.ratePercent ?? "19.00",
-    taxCategory: existing?.taxCategory ?? "S",
-    validFrom: existing?.validFrom ?? new Date().toISOString().slice(0, 10),
-    validTo: existing?.validTo ?? "",
-    isDefault: existing?.isDefault ?? false,
+    name: existing?.name ?? initialValues?.name ?? "",
+    ratePercent: existing?.ratePercent ?? initialValues?.ratePercent ?? "19.00",
+    taxCategory: existing?.taxCategory ?? initialValues?.taxCategory ?? "S",
+    validFrom: existing?.validFrom ?? initialValues?.validFrom ?? new Date().toISOString().slice(0, 10),
+    validTo: existing?.validTo ?? initialValues?.validTo ?? "",
+    isDefault: existing?.isDefault ?? initialValues?.isDefault ?? false,
   });
   const [error, setError] = useState("");
 
@@ -982,7 +1000,7 @@ function CreateTaxRateModal({ open, onClose, existing }: { open: boolean; onClos
   });
 
   return (
-    <Modal open={open} onClose={onClose} title={isEdit ? "Steuersatz bearbeiten" : "Neuer Steuersatz"}>
+    <Modal open={open} onClose={onClose} title={isEdit ? "Steuersatz bearbeiten" : initialValues ? "Nachfolger erstellen" : "Neuer Steuersatz"}>
       <form
         onSubmit={(e) => { e.preventDefault(); save.mutate(form); }}
         className="space-y-4"

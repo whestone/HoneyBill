@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import path from "node:path";
 import fs from "node:fs";
 import nodemailer from "nodemailer";
@@ -197,10 +197,28 @@ export async function taxRateRoutes(app: FastifyInstance) {
     const body = req.body as {
       name: string; ratePercent: string; taxCategory?: string; validFrom: string; isDefault?: boolean;
     };
+    const category = body.taxCategory ?? "S";
+
+    // Auto-close the previous active rate with the same category
+    const prevActive = await db
+      .select()
+      .from(taxRates)
+      .where(and(eq(taxRates.taxCategory, category), isNull(taxRates.validTo)))
+      .limit(1);
+    if (prevActive.length > 0) {
+      // validTo = one day before new validFrom
+      const newFrom = new Date(body.validFrom);
+      newFrom.setDate(newFrom.getDate() - 1);
+      const validToDate = newFrom.toISOString().slice(0, 10);
+      await db.update(taxRates)
+        .set({ validTo: validToDate })
+        .where(eq(taxRates.id, prevActive[0].id));
+    }
+
     const [row] = await db.insert(taxRates).values({
       name: body.name,
       ratePercent: body.ratePercent,
-      taxCategory: body.taxCategory ?? "S",
+      taxCategory: category,
       validFrom: body.validFrom,
       isDefault: body.isDefault ?? false,
     }).returning();
