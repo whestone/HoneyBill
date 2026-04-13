@@ -845,7 +845,6 @@ function TaxRatesTab() {
   const qc = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<TaxRate | null>(null);
-  const [successor, setSuccessor] = useState<Partial<TaxRateForm> | null>(null);
 
   const { data: taxRates, isLoading } = useQuery<TaxRate[]>({
     queryKey: ["tax-rates"],
@@ -909,20 +908,6 @@ function TaxRatesTab() {
                         <FileText size={14} />
                       </button>
                       <button
-                        onClick={() => setSuccessor({
-                          name: tr.name,
-                          taxCategory: tr.taxCategory,
-                          ratePercent: tr.ratePercent,
-                          validFrom: new Date().toISOString().slice(0, 10),
-                          validTo: "",
-                          isDefault: tr.isDefault,
-                        })}
-                        className="text-gray-300 hover:text-blue-500 transition-colors p-1"
-                        title="Nachfolger erstellen (neue Periode)"
-                      >
-                        <History size={14} />
-                      </button>
-                      <button
                         onClick={() => { if (confirm(`Steuersatz "${tr.name}" löschen?`)) deleteTaxRate.mutate(tr.id); }}
                         className="text-gray-300 hover:text-red-500 transition-colors p-1"
                         title="Löschen"
@@ -947,7 +932,6 @@ function TaxRatesTab() {
 
       <CreateTaxRateModal open={showCreate} onClose={() => setShowCreate(false)} />
       {editing && <CreateTaxRateModal open onClose={() => setEditing(null)} existing={editing} />}
-      {successor && <CreateTaxRateModal open onClose={() => setSuccessor(null)} initialValues={successor} />}
     </div>
   );
 }
@@ -963,20 +947,31 @@ interface TaxRateForm {
   isDefault: boolean;
 }
 
-function CreateTaxRateModal({ open, onClose, existing, initialValues }: {
-  open: boolean; onClose: () => void; existing?: TaxRate; initialValues?: Partial<TaxRateForm>;
+function CreateTaxRateModal({ open, onClose, existing }: {
+  open: boolean; onClose: () => void; existing?: TaxRate;
 }) {
   const qc = useQueryClient();
   const isEdit = !!existing;
   const [form, setForm] = useState<TaxRateForm>({
-    name: existing?.name ?? initialValues?.name ?? "",
-    ratePercent: existing?.ratePercent ?? initialValues?.ratePercent ?? "19.00",
-    taxCategory: existing?.taxCategory ?? initialValues?.taxCategory ?? "S",
-    validFrom: existing?.validFrom ?? initialValues?.validFrom ?? new Date().toISOString().slice(0, 10),
-    validTo: existing?.validTo ?? initialValues?.validTo ?? "",
-    isDefault: existing?.isDefault ?? initialValues?.isDefault ?? false,
+    name: existing?.name ?? "",
+    ratePercent: existing?.ratePercent ?? "19.00",
+    taxCategory: existing?.taxCategory ?? "S",
+    validFrom: existing?.validFrom ?? new Date().toISOString().slice(0, 10),
+    validTo: existing?.validTo ?? "",
+    isDefault: existing?.isDefault ?? false,
   });
   const [error, setError] = useState("");
+
+  // Neue-Periode-Formular (nur im Edit-Modus)
+  const [newPeriod, setNewPeriod] = useState({ ratePercent: existing?.ratePercent ?? "19.00", validFrom: new Date().toISOString().slice(0, 10) });
+  const [periodError, setPeriodError] = useState("");
+
+  // Historie aller Einträge gleichen Namens
+  const { data: history } = useQuery<TaxRate[]>({
+    queryKey: ["tax-rates-history", existing?.name],
+    queryFn: () => api.get(`/tax-rates?name=${encodeURIComponent(existing!.name)}`),
+    enabled: isEdit,
+  });
 
   const save = useMutation({
     mutationFn: (data: TaxRateForm) => {
@@ -987,10 +982,23 @@ function CreateTaxRateModal({ open, onClose, existing, initialValues }: {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tax-rates"] });
+      qc.invalidateQueries({ queryKey: ["tax-rates-history"] });
       onClose();
       setError("");
     },
     onError: (e: Error) => setError(e.message),
+  });
+
+  const addPeriod = useMutation({
+    mutationFn: (data: { ratePercent: string; validFrom: string }) =>
+      api.post(`/tax-rates/${existing!.id}/successor`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tax-rates"] });
+      qc.invalidateQueries({ queryKey: ["tax-rates-history", existing?.name] });
+      setPeriodError("");
+      setNewPeriod({ ratePercent: "", validFrom: new Date().toISOString().slice(0, 10) });
+    },
+    onError: (e: Error) => setPeriodError(e.message),
   });
 
   const field = (key: keyof TaxRateForm) => ({
@@ -1000,7 +1008,7 @@ function CreateTaxRateModal({ open, onClose, existing, initialValues }: {
   });
 
   return (
-    <Modal open={open} onClose={onClose} title={isEdit ? "Steuersatz bearbeiten" : initialValues ? "Nachfolger erstellen" : "Neuer Steuersatz"}>
+    <Modal open={open} onClose={onClose} title={isEdit ? "Steuersatz bearbeiten" : "Neuer Steuersatz"} size="xl">
       <form
         onSubmit={(e) => { e.preventDefault(); save.mutate(form); }}
         className="space-y-4"
@@ -1057,6 +1065,84 @@ function CreateTaxRateModal({ open, onClose, existing, initialValues }: {
           </button>
         </div>
       </form>
+
+      {/* Historie + Neue Periode – nur im Bearbeitungsmodus */}
+      {isEdit && (
+        <div className="mt-6 pt-5 border-t border-gray-100 space-y-4">
+          <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+            <History size={14} /> Gültigkeitshistorie
+          </h4>
+
+          {/* Historientabelle */}
+          <div className="overflow-hidden rounded border border-gray-100">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="table-header">Satz</th>
+                  <th className="table-header">Gültig ab</th>
+                  <th className="table-header">Gültig bis</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(history ?? []).slice().reverse().map((h) => (
+                  <tr key={h.id} className={`border-b border-gray-50 ${h.id === existing?.id ? "bg-honey-50" : ""}`}>
+                    <td className="table-cell font-mono font-medium">
+                      {parseFloat(h.ratePercent).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} %
+                    </td>
+                    <td className="table-cell text-gray-500">{h.validFrom}</td>
+                    <td className="table-cell text-gray-500">{h.validTo ?? <span className="text-green-600 font-medium">aktiv</span>}</td>
+                  </tr>
+                ))}
+                {!history?.length && (
+                  <tr><td colSpan={3} className="table-cell text-center text-gray-400 py-4">Keine Einträge</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Neue Periode hinzufügen */}
+          <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+            <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Neue Periode ab Datum</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Neuer Satz (%)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={newPeriod.ratePercent}
+                  onChange={(e) => setNewPeriod((p) => ({ ...p, ratePercent: e.target.value }))}
+                  className="input font-mono"
+                  placeholder="7.70"
+                />
+              </div>
+              <div>
+                <label className="label">Gültig ab *</label>
+                <input
+                  type="date"
+                  value={newPeriod.validFrom}
+                  onChange={(e) => setNewPeriod((p) => ({ ...p, validFrom: e.target.value }))}
+                  className="input"
+                />
+              </div>
+            </div>
+            {periodError && <p className="text-red-500 text-xs">{periodError}</p>}
+            <div className="text-xs text-gray-400">
+              Der aktuelle Satz wird automatisch zum Vortag abgeschlossen.
+            </div>
+            <button
+              type="button"
+              disabled={!newPeriod.ratePercent || !newPeriod.validFrom || addPeriod.isPending}
+              onClick={() => addPeriod.mutate(newPeriod)}
+              className="btn-secondary text-sm"
+            >
+              <Plus size={13} />
+              {addPeriod.isPending ? "Wird gespeichert…" : "Periode hinzufügen"}
+            </button>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }

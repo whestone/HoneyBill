@@ -179,13 +179,12 @@ export async function settingsRoutes(app: FastifyInstance) {
 export async function taxRateRoutes(app: FastifyInstance) {
   // GET /api/v1/tax-rates
   app.get("/", { onRequest: [app.authenticate] }, async (req, reply) => {
-    const q = req.query as { active?: string };
+    const q = req.query as { active?: string; name?: string };
     let rows;
-    if (q.active === "true") {
-      rows = await db
-        .select()
-        .from(taxRates)
-        .where(eq(taxRates.validTo, null as unknown as string));
+    if (q.name) {
+      rows = await db.select().from(taxRates).where(eq(taxRates.name, q.name)).orderBy(taxRates.validFrom);
+    } else if (q.active === "true") {
+      rows = await db.select().from(taxRates).where(isNull(taxRates.validTo));
     } else {
       rows = await db.select().from(taxRates).orderBy(taxRates.validFrom);
     }
@@ -197,30 +196,44 @@ export async function taxRateRoutes(app: FastifyInstance) {
     const body = req.body as {
       name: string; ratePercent: string; taxCategory?: string; validFrom: string; isDefault?: boolean;
     };
-    const category = body.taxCategory ?? "S";
-
-    // Auto-close the previous active rate with the same category
-    const prevActive = await db
-      .select()
-      .from(taxRates)
-      .where(and(eq(taxRates.taxCategory, category), isNull(taxRates.validTo)))
-      .limit(1);
-    if (prevActive.length > 0) {
-      // validTo = one day before new validFrom
-      const newFrom = new Date(body.validFrom);
-      newFrom.setDate(newFrom.getDate() - 1);
-      const validToDate = newFrom.toISOString().slice(0, 10);
-      await db.update(taxRates)
-        .set({ validTo: validToDate })
-        .where(eq(taxRates.id, prevActive[0].id));
-    }
-
     const [row] = await db.insert(taxRates).values({
       name: body.name,
       ratePercent: body.ratePercent,
-      taxCategory: category,
+      taxCategory: body.taxCategory ?? "S",
       validFrom: body.validFrom,
       isDefault: body.isDefault ?? false,
+    }).returning();
+    return reply.status(201).send(row);
+  });
+
+  // POST /api/v1/tax-rates/:id/successor — neue Periode für bestehenden Satz
+  app.post("/:id/successor", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = req.body as { ratePercent: string; validFrom: string };
+
+    const parent = await db.query.taxRates.findFirst({ where: eq(taxRates.id, Number(id)) });
+    if (!parent) return reply.status(404).send({ message: "Steuersatz nicht gefunden" });
+
+    if (body.validFrom <= parent.validFrom) {
+      return reply.status(400).send({ message: "Gültig ab muss nach dem Vorgänger liegen" });
+    }
+
+    // validTo des neuen Satzes darf keine aktive Periode überschneiden
+    const newFrom = new Date(body.validFrom);
+    newFrom.setDate(newFrom.getDate() - 1);
+    const validToDate = newFrom.toISOString().slice(0, 10);
+
+    // Alle aktiven Sätze gleichen Namens abschließen
+    await db.update(taxRates)
+      .set({ validTo: validToDate })
+      .where(and(eq(taxRates.name, parent.name), isNull(taxRates.validTo)));
+
+    const [row] = await db.insert(taxRates).values({
+      name: parent.name,
+      ratePercent: body.ratePercent,
+      taxCategory: parent.taxCategory,
+      validFrom: body.validFrom,
+      isDefault: parent.isDefault,
     }).returning();
     return reply.status(201).send(row);
   });
