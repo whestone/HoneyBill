@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Plus, Package, Pencil, Trash2 } from "lucide-react";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useTaxRates } from "@/api/hooks/useProducts";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Pagination } from "@/components/ui/Pagination";
@@ -22,9 +23,10 @@ export function ProductsPage() {
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const { data, isLoading } = useProducts({ page: String(page) });
   const deleteProduct = useDeleteProduct();
+  const confirm = useConfirm();
 
-  const handleDelete = (p: Product) => {
-    if (!confirm(`Produkt "${p.name}" wirklich löschen?`)) return;
+  const handleDelete = async (p: Product) => {
+    if (!await confirm(`Produkt "${p.name}" wirklich löschen?`, { title: "Produkt löschen" })) return;
     deleteProduct.mutate(p.id);
   };
 

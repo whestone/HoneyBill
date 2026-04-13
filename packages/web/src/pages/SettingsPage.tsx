@@ -11,6 +11,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { UpdateCompanySettingsSchema, type UpdateCompanySettingsInput } from "@honeybill/shared";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { Building2, CheckCircle, Percent, Plus, Trash2, FileText, Mail, Send, Eye, EyeOff, Users, ShieldCheck, UserCog, BadgeCheck, Hash, History } from "lucide-react";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
 import { usePDF } from "@react-pdf/renderer";
 import { InvoicePDF } from "@/components/pdf/InvoiceTemplate";
@@ -843,12 +844,13 @@ const TAX_CATEGORIES = [
 
 function TaxRatesTab() {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<TaxRate | null>(null);
 
   const { data: taxRates, isLoading } = useQuery<TaxRate[]>({
     queryKey: ["tax-rates"],
-    queryFn: () => api.get("/tax-rates"),
+    queryFn: () => api.get("/tax-rates?active=true"),
   });
 
   const deleteTaxRate = useMutation({
@@ -908,7 +910,7 @@ function TaxRatesTab() {
                         <FileText size={14} />
                       </button>
                       <button
-                        onClick={() => { if (confirm(`Steuersatz "${tr.name}" löschen?`)) deleteTaxRate.mutate(tr.id); }}
+                        onClick={async () => { if (await confirm(`Steuersatz "${tr.name}" löschen?`, { title: "Steuersatz löschen", confirmLabel: "Löschen" })) deleteTaxRate.mutate(tr.id); }}
                         className="text-gray-300 hover:text-red-500 transition-colors p-1"
                         title="Löschen"
                       >
@@ -1331,6 +1333,7 @@ const ROLE_ICONS: Record<UserRole, React.ReactNode> = {
 
 function UsersTab({ currentUserId }: { currentUserId: number }) {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
 
@@ -1410,7 +1413,7 @@ function UsersTab({ currentUserId }: { currentUserId: number }) {
                     {u.id !== currentUserId && (
                       u.isActive ? (
                         <button
-                          onClick={() => { const name = u.firstName || u.lastName ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() : u.fullName; if (confirm(`${name} deaktivieren?`)) deactivate.mutate(u.id); }}
+                          onClick={async () => { const name = u.firstName || u.lastName ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() : u.fullName; if (await confirm(`${name} deaktivieren?`, { title: "Benutzer deaktivieren", confirmLabel: "Deaktivieren" })) deactivate.mutate(u.id); }}
                           className="btn-danger text-xs py-1 px-2"
                         >
                           Deaktivieren

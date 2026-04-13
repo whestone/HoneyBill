@@ -20,6 +20,7 @@ import { PdfPreview } from "@/components/pdf/PdfPreview";
 import { formatEur, DOCUMENT_TYPE_LABELS, DEFAULT_EMAIL_SETTINGS } from "@honeybill/shared";
 import type { CompanySettings, Document, DocumentType, User } from "@honeybill/shared";
 import { ArrowLeft, CheckCircle, CreditCard, Edit2, FileText, Send, Truck, Trash2, XCircle, Mail } from "lucide-react";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { pdf } from "@react-pdf/renderer";
 import { InvoicePDF } from "@/components/pdf/InvoiceTemplate";
 import { useForm } from "react-hook-form";
@@ -44,6 +45,7 @@ export function DocumentDetailPage() {
     queryFn: () => api.get("/auth/me"),
   });
 
+  const confirm = useConfirm();
   const finalize = useFinalizeDocument();
   const send = useSendDocument();
   const cancel = useCancelDocument();
@@ -191,8 +193,8 @@ export function DocumentDetailPage() {
             )}
             {canDelete && (
               <button
-                onClick={() => {
-                  if (!confirm("Entwurf wirklich löschen?")) return;
+                onClick={async () => {
+                  if (!await confirm("Entwurf wirklich löschen?", { title: "Entwurf löschen", confirmLabel: "Löschen" })) return;
                   deleteDoc.mutate(doc.id, { onSuccess: () => navigate({ to: "/documents" }) });
                 }}
                 className="btn-danger"
@@ -202,8 +204,8 @@ export function DocumentDetailPage() {
             )}
             {canCancel && (
               <button
-                onClick={() => {
-                  if (!confirm("Beleg wirklich stornieren? Es wird automatisch eine Stornorechnung erstellt.")) return;
+                onClick={async () => {
+                  if (!await confirm("Beleg wirklich stornieren? Es wird automatisch eine Stornorechnung erstellt.", { title: "Stornieren", confirmLabel: "Stornieren" })) return;
                   cancel.mutate(doc.id, {
                     onSuccess: (res) => navigate({ to: "/documents/$id", params: { id: String(res.stornoId) } }),
                     onError: (e: any) => setActionError(e?.message ?? "Fehler beim Stornieren"),
