@@ -25,6 +25,7 @@ import {
 import { ArrowLeft, AlertCircle, CheckCircle, Plus, Save, Trash2, GripVertical, Search, FileText, Settings2 } from "lucide-react";
 import { TypeBadge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { PdfPreview } from "@/components/pdf/PdfPreview";
 import type { DocumentType, CompanySettings } from "@honeybill/shared";
 
@@ -93,6 +94,7 @@ export function DocumentEditorPage() {
 
   const { data: doc, isLoading } = useDocument(Number(id));
   const { data: taxRates = [] } = useTaxRates();
+  const confirm = useConfirm();
   const finalize = useFinalizeDocument();
   const deleteDoc = useDeleteDocument();
 
@@ -266,8 +268,8 @@ export function DocumentEditorPage() {
     });
   };
 
-  const handleDelete = () => {
-    if (!confirm("Entwurf wirklich löschen?")) return;
+  const handleDelete = async () => {
+    if (!await confirm("Entwurf wirklich löschen?", { title: "Entwurf löschen", confirmLabel: "Löschen" })) return;
     deleteDoc.mutate(Number(id), { onSuccess: () => navigate({ to: "/documents" }) });
   };
 
