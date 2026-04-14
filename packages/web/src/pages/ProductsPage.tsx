@@ -175,10 +175,12 @@ function ProductForm({
 
 function CreateProductModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const create = useCreateProduct();
+  const { data: taxRates } = useTaxRates();
+  const defaultTaxRateId = String(taxRates?.find((t) => t.isDefault)?.id ?? "");
   return (
     <Modal open={open} onClose={onClose} title="Neues Produkt">
       <ProductForm
-        initialValues={{ sku: "", name: "", description: "", unit: "Stk", unitPrice: "0.00", taxRateId: "" }}
+        initialValues={{ sku: "", name: "", description: "", unit: "Stk", unitPrice: "0.00", taxRateId: defaultTaxRateId }}
         onSubmit={(form) => create.mutate({ ...form, taxRateId: Number(form.taxRateId) }, { onSuccess: onClose })}
         isPending={create.isPending}
         onClose={onClose}
