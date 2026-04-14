@@ -199,6 +199,9 @@ export async function taxRateRoutes(app: FastifyInstance) {
     const body = req.body as {
       name: string; ratePercent: string; taxCategory?: string; validFrom: string; isDefault?: boolean;
     };
+    if (body.isDefault) {
+      await db.update(taxRates).set({ isDefault: false }).where(eq(taxRates.isDefault, true));
+    }
     const [row] = await db.insert(taxRates).values({
       name: body.name,
       ratePercent: body.ratePercent,
@@ -254,6 +257,9 @@ export async function taxRateRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const body = req.body as Partial<typeof taxRates.$inferInsert>;
     const { validTo: _vt, validFrom: _vf, ratePercent: _rp, ...meta } = body as any;
+    if (meta.isDefault) {
+      await db.update(taxRates).set({ isDefault: false }).where(eq(taxRates.isDefault, true));
+    }
     const [row] = await db
       .update(taxRates)
       .set(meta)
