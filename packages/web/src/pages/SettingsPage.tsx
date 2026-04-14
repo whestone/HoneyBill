@@ -954,39 +954,49 @@ function CreateTaxRateModal({ open, onClose, existing }: {
 }) {
   const qc = useQueryClient();
   const isEdit = !!existing;
-  const [form, setForm] = useState<TaxRateForm>({
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [form, setForm] = useState({
     name: existing?.name ?? "",
-    ratePercent: existing?.ratePercent ?? "19.00",
     taxCategory: existing?.taxCategory ?? "S",
-    validFrom: existing?.validFrom ?? new Date().toISOString().slice(0, 10),
+    ratePercent: existing?.ratePercent ?? "19.00",
+    validFrom: existing?.validFrom ?? today,
     validTo: existing?.validTo ?? "",
     isDefault: existing?.isDefault ?? false,
   });
   const [error, setError] = useState("");
-
-  // Neue-Periode-Formular (nur im Edit-Modus)
-  const [newPeriod, setNewPeriod] = useState({ ratePercent: existing?.ratePercent ?? "19.00", validFrom: new Date().toISOString().slice(0, 10) });
+  const [newPeriod, setNewPeriod] = useState({ ratePercent: "", validFrom: today });
   const [periodError, setPeriodError] = useState("");
 
-  // Historie aller Einträge gleichen Namens
-  const { data: history } = useQuery<TaxRate[]>({
+  const { data: history, refetch: refetchHistory } = useQuery<TaxRate[]>({
     queryKey: ["tax-rates-history", existing?.name],
     queryFn: () => api.get(`/tax-rates?name=${encodeURIComponent(existing!.name)}`),
     enabled: isEdit,
   });
 
   const save = useMutation({
-    mutationFn: (data: TaxRateForm) => {
-      const payload = { ...data, validTo: data.validTo || null };
-      return isEdit
-        ? api.put(`/tax-rates/${existing!.id}`, payload)
-        : api.post("/tax-rates", payload);
+    mutationFn: () => {
+      if (isEdit) {
+        // PUT: nur Metadaten (name, taxCategory, isDefault) — nie ratePercent/validFrom/validTo
+        return api.put(`/tax-rates/${existing!.id}`, {
+          name: form.name,
+          taxCategory: form.taxCategory,
+          isDefault: form.isDefault,
+        });
+      }
+      return api.post("/tax-rates", {
+        name: form.name,
+        ratePercent: form.ratePercent,
+        taxCategory: form.taxCategory,
+        validFrom: form.validFrom,
+        validTo: form.validTo || null,
+        isDefault: form.isDefault,
+      });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tax-rates"] });
       qc.invalidateQueries({ queryKey: ["tax-rates-history"] });
       onClose();
-      setError("");
     },
     onError: (e: Error) => setError(e.message),
   });
@@ -996,14 +1006,22 @@ function CreateTaxRateModal({ open, onClose, existing }: {
       api.post(`/tax-rates/${existing!.id}/successor`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tax-rates"] });
-      qc.invalidateQueries({ queryKey: ["tax-rates-history", existing?.name] });
+      refetchHistory();
       setPeriodError("");
-      setNewPeriod({ ratePercent: "", validFrom: new Date().toISOString().slice(0, 10) });
+      setNewPeriod({ ratePercent: "", validFrom: today });
     },
     onError: (e: Error) => setPeriodError(e.message),
   });
 
-  const field = (key: keyof TaxRateForm) => ({
+  const deleteHistory = useMutation({
+    mutationFn: (id: number) => api.delete(`/tax-rates/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tax-rates"] });
+      refetchHistory();
+    },
+  });
+
+  const field = (key: keyof typeof form) => ({
     value: String(form[key]),
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setForm((f) => ({ ...f, [key]: e.target.value })),
@@ -1011,43 +1029,55 @@ function CreateTaxRateModal({ open, onClose, existing }: {
 
   return (
     <Modal open={open} onClose={onClose} title={isEdit ? "Steuersatz bearbeiten" : "Neuer Steuersatz"} size="xl">
-      <form
-        onSubmit={(e) => { e.preventDefault(); save.mutate(form); }}
-        className="space-y-4"
-      >
+      <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
             <label className="label">Bezeichnung *</label>
             <input {...field("name")} required className="input" placeholder="z. B. Normalsatz 19%" />
           </div>
-          <div>
-            <label className="label">Steuersatz (%) *</label>
-            <input
-              {...field("ratePercent")}
-              required
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              className="input font-mono"
-            />
-          </div>
-          <div>
-            <label className="label">Kategorie (EN 16931) *</label>
-            <select {...field("taxCategory")} className="input">
-              {TAX_CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label">Gültig ab *</label>
-            <input {...field("validFrom")} required type="date" className="input" />
-          </div>
-          <div>
-            <label className="label">Gültig bis (leer = unbegrenzt)</label>
-            <input {...field("validTo")} type="date" className="input" />
-          </div>
+          {/* Im Bearbeiten-Modus: Satz und Gültig-ab als Nur-Lesen anzeigen */}
+          {isEdit ? (
+            <>
+              <div>
+                <label className="label">Aktueller Satz</label>
+                <p className="input bg-gray-50 text-gray-500 font-mono">
+                  {parseFloat(existing!.ratePercent).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} %
+                  <span className="text-xs ml-2 text-gray-400">(per Neue Periode ändern)</span>
+                </p>
+              </div>
+              <div>
+                <label className="label">Kategorie (EN 16931) *</label>
+                <select {...field("taxCategory")} className="input">
+                  {TAX_CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label className="label">Steuersatz (%) *</label>
+                <input {...field("ratePercent")} required type="number" step="0.01" min="0" max="100" className="input font-mono" />
+              </div>
+              <div>
+                <label className="label">Kategorie (EN 16931) *</label>
+                <select {...field("taxCategory")} className="input">
+                  {TAX_CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">Gültig ab *</label>
+                <input {...field("validFrom")} required type="date" className="input" />
+              </div>
+              <div>
+                <label className="label">Gültig bis (leer = unbegrenzt)</label>
+                <input {...field("validTo")} type="date" className="input" />
+              </div>
+            </>
+          )}
         </div>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -1075,7 +1105,6 @@ function CreateTaxRateModal({ open, onClose, existing }: {
             <History size={14} /> Gültigkeitshistorie
           </h4>
 
-          {/* Historientabelle */}
           <div className="overflow-hidden rounded border border-gray-100">
             <table className="w-full text-sm">
               <thead>
@@ -1083,20 +1112,42 @@ function CreateTaxRateModal({ open, onClose, existing }: {
                   <th className="table-header">Satz</th>
                   <th className="table-header">Gültig ab</th>
                   <th className="table-header">Gültig bis</th>
+                  <th className="table-header"></th>
                 </tr>
               </thead>
               <tbody>
-                {(history ?? []).slice().reverse().map((h) => (
-                  <tr key={h.id} className={`border-b border-gray-50 ${h.id === existing?.id ? "bg-honey-50" : ""}`}>
-                    <td className="table-cell font-mono font-medium">
-                      {parseFloat(h.ratePercent).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} %
-                    </td>
-                    <td className="table-cell text-gray-500">{h.validFrom}</td>
-                    <td className="table-cell text-gray-500">{h.validTo ?? <span className="text-green-600 font-medium">aktiv</span>}</td>
-                  </tr>
-                ))}
+                {(history ?? []).slice().reverse().map((h) => {
+                  const isFuture = h.validFrom > today;
+                  const isCurrent = h.id === existing?.id;
+                  return (
+                    <tr key={h.id} className={`border-b border-gray-50 ${isCurrent ? "bg-honey-50" : ""}`}>
+                      <td className="table-cell font-mono font-medium">
+                        {parseFloat(h.ratePercent).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} %
+                      </td>
+                      <td className="table-cell text-gray-500">{h.validFrom}</td>
+                      <td className="table-cell text-gray-500">
+                        {h.validTo
+                          ? h.validTo
+                          : isFuture
+                            ? <span className="text-blue-500 font-medium">geplant</span>
+                            : <span className="text-green-600 font-medium">aktiv</span>
+                        }
+                      </td>
+                      <td className="table-cell">
+                        <button
+                          type="button"
+                          onClick={() => deleteHistory.mutate(h.id)}
+                          className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                          title="Eintrag löschen"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
                 {!history?.length && (
-                  <tr><td colSpan={3} className="table-cell text-center text-gray-400 py-4">Keine Einträge</td></tr>
+                  <tr><td colSpan={4} className="table-cell text-center text-gray-400 py-4">Keine Einträge</td></tr>
                 )}
               </tbody>
             </table>

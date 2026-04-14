@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, lte } from "drizzle-orm";
 import path from "node:path";
 import fs from "node:fs";
 import nodemailer from "nodemailer";
@@ -184,7 +184,10 @@ export async function taxRateRoutes(app: FastifyInstance) {
     if (q.name) {
       rows = await db.select().from(taxRates).where(eq(taxRates.name, q.name)).orderBy(taxRates.validFrom);
     } else if (q.active === "true") {
-      rows = await db.select().from(taxRates).where(isNull(taxRates.validTo));
+      const today = new Date().toISOString().slice(0, 10);
+      rows = await db.select().from(taxRates)
+        .where(and(isNull(taxRates.validTo), lte(taxRates.validFrom, today)))
+        .orderBy(taxRates.validFrom);
     } else {
       rows = await db.select().from(taxRates).orderBy(taxRates.validFrom);
     }
@@ -246,13 +249,14 @@ export async function taxRateRoutes(app: FastifyInstance) {
     return reply.send(row);
   });
 
-  // PUT /api/v1/tax-rates/:id
+  // PUT /api/v1/tax-rates/:id — nur Metadaten, nie validTo/validFrom/ratePercent
   app.put("/:id", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const body = req.body as Partial<typeof taxRates.$inferInsert>;
+    const { validTo: _vt, validFrom: _vf, ratePercent: _rp, ...meta } = body as any;
     const [row] = await db
       .update(taxRates)
-      .set(body)
+      .set(meta)
       .where(eq(taxRates.id, Number(id)))
       .returning();
     if (!row) return reply.status(404).send({ message: "Steuersatz nicht gefunden" });
