@@ -234,6 +234,11 @@ export async function taxRateRoutes(app: FastifyInstance) {
       .set({ validTo: validToDate })
       .where(and(eq(taxRates.name, parent.name), isNull(taxRates.validTo)));
 
+    // Exklusives Default: andere Sätze zurücksetzen falls Parent Standard war
+    if (parent.isDefault) {
+      await db.update(taxRates).set({ isDefault: false }).where(eq(taxRates.isDefault, true));
+    }
+
     const [row] = await db.insert(taxRates).values({
       name: parent.name,
       ratePercent: body.ratePercent,
