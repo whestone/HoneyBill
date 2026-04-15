@@ -5,7 +5,7 @@ import { useProducts, useCreateProduct, useDeleteProduct, useTaxRates } from "@/
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
-import { formatEur, parseDecimalInput } from "@honeybill/shared";
+import { formatEur, formatDecimalGerman, germanToApiDecimal } from "@honeybill/shared";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 
@@ -144,7 +144,7 @@ function ProductForm({
   });
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit({ ...form, unitPrice: parseDecimalInput(form.unitPrice) }); }} className="space-y-4">
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit({ ...form, unitPrice: germanToApiDecimal(form.unitPrice) }); }} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="label">SKU *</label>
@@ -167,7 +167,7 @@ function ProductForm({
             required
             className="input font-mono"
             placeholder="0,00"
-            onBlur={(e) => setForm((f) => ({ ...f, unitPrice: parseDecimalInput(e.target.value) }))}
+            onBlur={(e) => setForm((f) => ({ ...f, unitPrice: formatDecimalGerman(e.target.value) }))}
           />
         </div>
         <div>
@@ -203,7 +203,7 @@ function CreateProductModal({ open, onClose }: { open: boolean; onClose: () => v
   return (
     <Modal open={open} onClose={onClose} title="Neues Produkt">
       <ProductForm
-        initialValues={{ sku: "", name: "", description: "", unit: "Stk", unitPrice: "0.00", taxRateId: defaultTaxRateId }}
+        initialValues={{ sku: "", name: "", description: "", unit: "Stk", unitPrice: "0,00", taxRateId: defaultTaxRateId }}
         onSubmit={(form) => create.mutate({ ...form, taxRateId: Number(form.taxRateId) }, { onSuccess: onClose })}
         isPending={create.isPending}
         onClose={onClose}
@@ -382,7 +382,7 @@ function EditProductModal({ product, onClose }: { product: Product; onClose: () 
                 inputMode="decimal"
                 value={newPeriod.unitPrice}
                 onChange={(e) => setNewPeriod((p) => ({ ...p, unitPrice: e.target.value }))}
-                onBlur={(e) => setNewPeriod((p) => ({ ...p, unitPrice: parseDecimalInput(e.target.value) }))}
+                onBlur={(e) => setNewPeriod((p) => ({ ...p, unitPrice: formatDecimalGerman(e.target.value) }))}
                 className="input font-mono"
                 placeholder="0,00"
               />
@@ -404,7 +404,7 @@ function EditProductModal({ product, onClose }: { product: Product; onClose: () 
           <button
             type="button"
             disabled={!newPeriod.unitPrice || !newPeriod.validFrom || addPeriod.isPending}
-            onClick={() => addPeriod.mutate({ ...newPeriod, unitPrice: parseDecimalInput(newPeriod.unitPrice) })}
+            onClick={() => addPeriod.mutate({ ...newPeriod, unitPrice: germanToApiDecimal(newPeriod.unitPrice) })}
             className="btn-secondary text-sm"
           >
             <Plus size={13} />
