@@ -65,3 +65,39 @@ export function parseDecimalInput(raw: string): string {
   const d = new Decimal(normalized || "0");
   return d.toFixed(2);
 }
+
+/** Format a decimal value for German UI input fields (comma as decimal, no thousands sep).
+ *  Accepts both German ("6,66" / "1.234,56") and API ("6.66") format as input.
+ *  Returns "6,66" / "1234,56" etc. Empty string in → empty string out.
+ */
+export function formatDecimalGerman(raw: string | number | null | undefined): string {
+  if (raw === null || raw === undefined || raw === "") return "";
+  const s = String(raw).trim();
+  if (!s) return "";
+  try {
+    let normalized: string;
+    if (s.includes(",")) {
+      // German format: strip thousands dots, replace comma with dot
+      normalized = s.replace(/\./g, "").replace(",", ".");
+    } else {
+      // No comma — assume period is decimal separator (API format)
+      normalized = s;
+    }
+    const d = new Decimal(normalized);
+    return d.toFixed(2).replace(".", ",");
+  } catch {
+    return s;
+  }
+}
+
+/** Convert a German-format UI string ("6,66") to API decimal string ("6.66"). */
+export function germanToApiDecimal(raw: string): string {
+  if (!raw?.trim()) return "0.00";
+  // Strip thousands dots, replace comma with dot, then parse with Decimal
+  const normalized = raw.replace(/\./g, "").replace(",", ".");
+  try {
+    return new Decimal(normalized).toFixed(2);
+  } catch {
+    return "0.00";
+  }
+}
