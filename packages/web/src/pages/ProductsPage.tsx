@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Plus, Package, Pencil, Trash2, History } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useTaxRates } from "@/api/hooks/useProducts";
+import { useProducts, useCreateProduct, useDeleteProduct, useTaxRates } from "@/api/hooks/useProducts";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
@@ -217,6 +217,7 @@ function EditProductModal({ product, onClose }: { product: Product; onClose: () 
     unit: product.unit,
     taxRateId: product.taxRateId ? String(product.taxRateId) : "",
   });
+  const [currentPrice, setCurrentPrice] = useState(product.unitPrice);
   const [newPeriod, setNewPeriod] = useState({ unitPrice: "", validFrom: today });
   const [periodError, setPeriodError] = useState("");
 
@@ -225,7 +226,6 @@ function EditProductModal({ product, onClose }: { product: Product; onClose: () 
     queryFn: () => api.get(`/products/${product.id}/price-history`),
   });
 
-  const update = useUpdateProduct(product.id);
   const save = useMutation({
     mutationFn: () => api.put(`/products/${product.id}`, {
       sku: form.sku,
@@ -233,7 +233,7 @@ function EditProductModal({ product, onClose }: { product: Product; onClose: () 
       description: form.description,
       unit: form.unit,
       taxRateId: Number(form.taxRateId),
-      unitPrice: product.unitPrice, // Preis nicht über diesen Pfad ändern
+      unitPrice: currentPrice, // Preis nicht über diesen Pfad ändern
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products"] });
@@ -244,7 +244,8 @@ function EditProductModal({ product, onClose }: { product: Product; onClose: () 
   const addPeriod = useMutation({
     mutationFn: (data: { unitPrice: string; validFrom: string }) =>
       api.post(`/products/${product.id}/price-history/successor`, data),
-    onSuccess: () => {
+    onSuccess: (_result, vars) => {
+      if (vars.validFrom <= today) setCurrentPrice(vars.unitPrice);
       qc.invalidateQueries({ queryKey: ["products"] });
       refetchHistory();
       setPeriodError("");
@@ -283,7 +284,7 @@ function EditProductModal({ product, onClose }: { product: Product; onClose: () 
           <div>
             <label className="label">Aktueller Preis (netto)</label>
             <p className="input bg-gray-50 text-gray-500">
-              {formatEur(product.unitPrice)}
+              {formatEur(currentPrice)}
               <span className="text-xs ml-2 text-gray-400">(per Neue Periode ändern)</span>
             </p>
           </div>
