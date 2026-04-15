@@ -347,7 +347,22 @@ export const documentFilesRelations = relations(documentFiles, ({ one }) => ({
   }),
 }));
 
-export const productsRelations = relations(products, ({ one }) => ({
+// ─── Product Price History ────────────────────────────────────────────────────
+
+export const productPriceHistory = sqliteTable("product_price_history", {
+  id:        int("id").primaryKey({ autoIncrement: true }),
+  productId: int("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  unitPrice: text("unit_price").notNull(),
+  validFrom: text("valid_from").notNull(),
+  validTo:   text("valid_to"),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
+export const productPriceHistoryRelations = relations(productPriceHistory, ({ one }) => ({
+  product: one(products, { fields: [productPriceHistory.productId], references: [products.id] }),
+}));
+
+export const productsRelations = relations(products, ({ one, many }) => ({
   taxRate: one(taxRates, {
     fields: [products.taxRateId],
     references: [taxRates.id],
@@ -356,6 +371,7 @@ export const productsRelations = relations(products, ({ one }) => ({
     fields: [products.categoryId],
     references: [productCategories.id],
   }),
+  priceHistory: many(productPriceHistory),
 }));
 
 export const taxRatesRelations = relations(taxRates, ({ many }) => ({

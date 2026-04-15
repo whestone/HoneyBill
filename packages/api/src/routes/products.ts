@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
-import { and, desc, eq, like, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, lte, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { productCategories, products } from "../db/schema.js";
+import { productCategories, productPriceHistory, products } from "../db/schema.js";
 import { CreateProductSchema, UpdateProductSchema } from "@honeybill/shared";
 
 export async function productRoutes(app: FastifyInstance) {
@@ -17,18 +17,15 @@ export async function productRoutes(app: FastifyInstance) {
     if (q.category) conditions.push(eq(products.categoryId, Number(q.category)));
 
     const [total, rows] = await Promise.all([
-      db
-        .select({ count: sql<number>`count(*)` })
-        .from(products)
-        .where(and(...conditions))
+      db.select({ count: sql<number>`count(*)` }).from(products).where(and(...conditions))
         .then((r) => r[0]?.count ?? 0),
-      db
-        .select()
-        .from(products)
-        .where(and(...conditions))
-        .orderBy(desc(products.createdAt))
-        .limit(limit)
-        .offset(offset),
+      db.query.products.findMany({
+        where: and(...conditions),
+        with: { taxRate: true },
+        orderBy: [desc(products.createdAt)],
+        limit,
+        offset,
+      }),
     ]);
 
     return reply.send({ data: rows, total, page, limit, totalPages: Math.ceil(total / limit) });
@@ -38,6 +35,12 @@ export async function productRoutes(app: FastifyInstance) {
   app.post("/", { onRequest: [app.authenticate] }, async (req, reply) => {
     const input = CreateProductSchema.parse(req.body);
     const [row] = await db.insert(products).values(input).returning();
+    // Initialen Preiseintrag in die Historie schreiben
+    await db.insert(productPriceHistory).values({
+      productId: row.id,
+      unitPrice: row.unitPrice,
+      validFrom: new Date().toISOString().slice(0, 10),
+    });
     return reply.status(201).send(row);
   });
 
@@ -72,6 +75,66 @@ export async function productRoutes(app: FastifyInstance) {
       .update(products)
       .set({ isArchived: true, updatedAt: new Date().toISOString() })
       .where(eq(products.id, Number(id)));
+    return reply.status(204).send();
+  });
+
+  // GET /api/v1/products/:id/price-history
+  app.get("/:id/price-history", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const rows = await db.select().from(productPriceHistory)
+      .where(eq(productPriceHistory.productId, Number(id)))
+      .orderBy(productPriceHistory.validFrom);
+    return reply.send(rows);
+  });
+
+  // POST /api/v1/products/:id/price-history/successor — neue Preisperiode
+  app.post("/:id/price-history/successor", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = req.body as { unitPrice: string; validFrom: string };
+    const today = new Date().toISOString().slice(0, 10);
+
+    const product = await db.query.products.findFirst({ where: eq(products.id, Number(id)) });
+    if (!product) return reply.status(404).send({ message: "Produkt nicht gefunden" });
+
+    // Aktive Periode ermitteln
+    const active = await db.select().from(productPriceHistory)
+      .where(and(eq(productPriceHistory.productId, Number(id)), isNull(productPriceHistory.validTo)))
+      .limit(1);
+
+    if (active.length > 0 && body.validFrom <= active[0].validFrom) {
+      return reply.status(400).send({ message: "Gültig ab muss nach der aktuellen Periode liegen" });
+    }
+
+    // Aktive Periode abschließen
+    if (active.length > 0) {
+      const prevTo = new Date(body.validFrom);
+      prevTo.setDate(prevTo.getDate() - 1);
+      await db.update(productPriceHistory)
+        .set({ validTo: prevTo.toISOString().slice(0, 10) })
+        .where(eq(productPriceHistory.id, active[0].id));
+    }
+
+    // Neue Periode anlegen
+    const [row] = await db.insert(productPriceHistory).values({
+      productId: Number(id),
+      unitPrice: body.unitPrice,
+      validFrom: body.validFrom,
+    }).returning();
+
+    // Aktuellen Preis am Produkt nur aktualisieren wenn validFrom <= heute
+    if (body.validFrom <= today) {
+      await db.update(products)
+        .set({ unitPrice: body.unitPrice, updatedAt: new Date().toISOString() })
+        .where(eq(products.id, Number(id)));
+    }
+
+    return reply.status(201).send(row);
+  });
+
+  // DELETE /api/v1/products/price-history/:hid
+  app.delete("/price-history/:hid", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { hid } = req.params as { hid: string };
+    await db.delete(productPriceHistory).where(eq(productPriceHistory.id, Number(hid)));
     return reply.status(204).send();
   });
 }
