@@ -10,17 +10,25 @@ export function round2(value: Decimal | string | number): string {
   return new Decimal(value).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toFixed(2);
 }
 
-/** Compute line net: qty * unitPrice * (1 - discountPct / 100), rounded to 2dp. */
+/** Compute line net, supporting both percentage and absolute discount.
+ *  discountType = "pct": lineNet = qty * price * (1 - discount/100)
+ *  discountType = "abs": lineNet = max(0, qty * price - discount)
+ */
 export function computeLineNet(
   quantity: string,
   unitPrice: string,
-  discountPct: string
+  discountPct: string,
+  discountType: "pct" | "abs" = "pct"
 ): string {
   const qty = new Decimal(quantity);
   const price = new Decimal(unitPrice);
-  const discount = new Decimal(discountPct);
-  const factor = new Decimal(1).minus(discount.div(100));
-  return round2(qty.mul(price).mul(factor));
+  const gross = qty.mul(price);
+  if (discountType === "abs") {
+    const absDiscount = new Decimal(discountPct);
+    return round2(Decimal.max(0, gross.minus(absDiscount)));
+  }
+  const factor = new Decimal(1).minus(new Decimal(discountPct).div(100));
+  return round2(gross.mul(factor));
 }
 
 /** Compute line tax: lineNet * taxRatePct / 100, rounded to 2dp. */

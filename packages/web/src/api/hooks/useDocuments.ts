@@ -61,7 +61,7 @@ export function useSendDocument() {
 
 export function useCancelDocument() {
   const qc = useQueryClient();
-  return useMutation({
+  return useMutation<{ ok: boolean; stornoId: number }, Error, number>({
     mutationFn: (id: number) => api.post(`/documents/${id}/cancel`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["documents"] }),
   });

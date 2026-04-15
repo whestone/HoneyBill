@@ -21,7 +21,7 @@ export function useProduct(id: number) {
 export function useTaxRates() {
   return useQuery<TaxRate[]>({
     queryKey: ["tax-rates"],
-    queryFn: () => api.get("/tax-rates"),
+    queryFn: () => api.get("/tax-rates?active=true"),
     staleTime: 5 * 60_000,
   });
 }

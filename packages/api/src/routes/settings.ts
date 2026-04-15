@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull, lte } from "drizzle-orm";
 import path from "node:path";
 import fs from "node:fs";
 import nodemailer from "nodemailer";
@@ -179,13 +179,15 @@ export async function settingsRoutes(app: FastifyInstance) {
 export async function taxRateRoutes(app: FastifyInstance) {
   // GET /api/v1/tax-rates
   app.get("/", { onRequest: [app.authenticate] }, async (req, reply) => {
-    const q = req.query as { active?: string };
+    const q = req.query as { active?: string; name?: string };
     let rows;
-    if (q.active === "true") {
-      rows = await db
-        .select()
-        .from(taxRates)
-        .where(eq(taxRates.validTo, null as unknown as string));
+    if (q.name) {
+      rows = await db.select().from(taxRates).where(eq(taxRates.name, q.name)).orderBy(taxRates.validFrom);
+    } else if (q.active === "true") {
+      const today = new Date().toISOString().slice(0, 10);
+      rows = await db.select().from(taxRates)
+        .where(and(isNull(taxRates.validTo), lte(taxRates.validFrom, today)))
+        .orderBy(taxRates.validFrom);
     } else {
       rows = await db.select().from(taxRates).orderBy(taxRates.validFrom);
     }
@@ -197,12 +199,52 @@ export async function taxRateRoutes(app: FastifyInstance) {
     const body = req.body as {
       name: string; ratePercent: string; taxCategory?: string; validFrom: string; isDefault?: boolean;
     };
+    if (body.isDefault) {
+      await db.update(taxRates).set({ isDefault: false }).where(eq(taxRates.isDefault, true));
+    }
     const [row] = await db.insert(taxRates).values({
       name: body.name,
       ratePercent: body.ratePercent,
       taxCategory: body.taxCategory ?? "S",
       validFrom: body.validFrom,
       isDefault: body.isDefault ?? false,
+    }).returning();
+    return reply.status(201).send(row);
+  });
+
+  // POST /api/v1/tax-rates/:id/successor — neue Periode für bestehenden Satz
+  app.post("/:id/successor", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = req.body as { ratePercent: string; validFrom: string };
+
+    const parent = await db.query.taxRates.findFirst({ where: eq(taxRates.id, Number(id)) });
+    if (!parent) return reply.status(404).send({ message: "Steuersatz nicht gefunden" });
+
+    if (body.validFrom <= parent.validFrom) {
+      return reply.status(400).send({ message: "Gültig ab muss nach dem Vorgänger liegen" });
+    }
+
+    // validTo des neuen Satzes darf keine aktive Periode überschneiden
+    const newFrom = new Date(body.validFrom);
+    newFrom.setDate(newFrom.getDate() - 1);
+    const validToDate = newFrom.toISOString().slice(0, 10);
+
+    // Alle aktiven Sätze gleichen Namens abschließen
+    await db.update(taxRates)
+      .set({ validTo: validToDate })
+      .where(and(eq(taxRates.name, parent.name), isNull(taxRates.validTo)));
+
+    // Exklusives Default: andere Sätze zurücksetzen falls Parent Standard war
+    if (parent.isDefault) {
+      await db.update(taxRates).set({ isDefault: false }).where(eq(taxRates.isDefault, true));
+    }
+
+    const [row] = await db.insert(taxRates).values({
+      name: parent.name,
+      ratePercent: body.ratePercent,
+      taxCategory: parent.taxCategory,
+      validFrom: body.validFrom,
+      isDefault: parent.isDefault,
     }).returning();
     return reply.status(201).send(row);
   });
@@ -215,13 +257,17 @@ export async function taxRateRoutes(app: FastifyInstance) {
     return reply.send(row);
   });
 
-  // PUT /api/v1/tax-rates/:id
+  // PUT /api/v1/tax-rates/:id — nur Metadaten, nie validTo/validFrom/ratePercent
   app.put("/:id", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const body = req.body as Partial<typeof taxRates.$inferInsert>;
+    const { validTo: _vt, validFrom: _vf, ratePercent: _rp, ...meta } = body as any;
+    if (meta.isDefault) {
+      await db.update(taxRates).set({ isDefault: false }).where(eq(taxRates.isDefault, true));
+    }
     const [row] = await db
       .update(taxRates)
-      .set(body)
+      .set(meta)
       .where(eq(taxRates.id, Number(id)))
       .returning();
     if (!row) return reply.status(404).send({ message: "Steuersatz nicht gefunden" });
@@ -259,7 +305,8 @@ export async function numberSeriesRoutes(app: FastifyInstance) {
   // POST /api/v1/number-series/:documentType/preview
   app.post("/:documentType/preview", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { documentType } = req.params as { documentType: string };
-    const preview = previewNextNumber(sqlite, documentType as DocumentType);
+    const body = (req.body ?? {}) as { format?: string };
+    const preview = previewNextNumber(sqlite, documentType as DocumentType, body.format);
     return reply.send({ preview });
   });
 }

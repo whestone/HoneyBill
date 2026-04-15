@@ -18,8 +18,9 @@ import { StatusBadge, TypeBadge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { PdfPreview } from "@/components/pdf/PdfPreview";
 import { formatEur, DOCUMENT_TYPE_LABELS, DEFAULT_EMAIL_SETTINGS } from "@honeybill/shared";
-import type { CompanySettings, Document, DocumentType } from "@honeybill/shared";
+import type { CompanySettings, Document, DocumentType, User } from "@honeybill/shared";
 import { ArrowLeft, CheckCircle, CreditCard, Edit2, FileText, Send, Truck, Trash2, XCircle, Mail } from "lucide-react";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { pdf } from "@react-pdf/renderer";
 import { InvoicePDF } from "@/components/pdf/InvoiceTemplate";
 import { useForm } from "react-hook-form";
@@ -39,7 +40,12 @@ export function DocumentDetailPage() {
     queryKey: ["company-settings"],
     queryFn: () => api.get("/settings/company"),
   });
+  const { data: me } = useQuery<User>({
+    queryKey: ["me"],
+    queryFn: () => api.get("/auth/me"),
+  });
 
+  const confirm = useConfirm();
   const finalize = useFinalizeDocument();
   const send = useSendDocument();
   const cancel = useCancelDocument();
@@ -187,8 +193,8 @@ export function DocumentDetailPage() {
             )}
             {canDelete && (
               <button
-                onClick={() => {
-                  if (!confirm("Entwurf wirklich löschen?")) return;
+                onClick={async () => {
+                  if (!await confirm("Entwurf wirklich löschen?", { title: "Entwurf löschen", confirmLabel: "Löschen" })) return;
                   deleteDoc.mutate(doc.id, { onSuccess: () => navigate({ to: "/documents" }) });
                 }}
                 className="btn-danger"
@@ -198,9 +204,10 @@ export function DocumentDetailPage() {
             )}
             {canCancel && (
               <button
-                onClick={() => {
-                  if (!confirm("Beleg wirklich stornieren?")) return;
+                onClick={async () => {
+                  if (!await confirm("Beleg wirklich stornieren? Es wird automatisch eine Stornorechnung erstellt.", { title: "Stornieren", confirmLabel: "Stornieren" })) return;
                   cancel.mutate(doc.id, {
+                    onSuccess: (res) => navigate({ to: "/documents/$id", params: { id: String(res.stornoId) } }),
                     onError: (e: any) => setActionError(e?.message ?? "Fehler beim Stornieren"),
                   });
                 }}
@@ -235,7 +242,7 @@ export function DocumentDetailPage() {
                 <div>
                   <div className="text-gray-500 text-xs mb-1">Storniert Beleg</div>
                   <Link to="/documents/$id" params={{ id: String(doc.cancelsDocumentId) }} className="text-honey-600 hover:underline">
-                    #{doc.cancelsDocumentId}
+                    {(doc as any).cancelsDocument?.documentNumber ?? `#${doc.cancelsDocumentId}`}
                   </Link>
                 </div>
               )}
@@ -457,6 +464,7 @@ export function DocumentDetailPage() {
           onClose={() => setShowEmail(false)}
           doc={doc}
           company={company}
+          me={me ?? null}
         />
       )}
     </div>
@@ -471,46 +479,70 @@ function parseCustomer(doc: Document): any {
   return raw ?? null;
 }
 
-function resolvePlaceholders(template: string, doc: Document, company: CompanySettings): string {
+function resolvePlaceholders(template: string, doc: Document, company: CompanySettings, me: User | null = null): string {
   const customer = parseCustomer(doc);
-  const customerName =
-    customer?.companyName ||
-    `${customer?.firstName ?? ""} ${customer?.lastName ?? ""}`.trim() ||
-    "—";
+  // {{kundenName}} = always company name
+  const kundenName = customer?.companyName ?? "—";
+  // {{anrede}} = just "Herr" / "Frau" / empty
   const anrede = (() => {
-    const lastName = (customer?.lastName ?? "").trim();
-    if (!lastName) return "Sehr geehrte Damen und Herren,";
     const sal = (customer?.salutation ?? "").toLowerCase();
-    const form = sal === "frau" ? "geehrte Frau" : sal === "herr" ? "geehrter Herr" : "geehrte/r";
-    return `Sehr ${form} ${lastName},`;
+    if (sal === "herr") return "Herr";
+    if (sal === "frau") return "Frau";
+    return "";
   })();
   const typeLabel =
     DOCUMENT_TYPE_LABELS[doc.documentType as keyof typeof DOCUMENT_TYPE_LABELS] ?? doc.documentType;
-  const dueDate = doc.dueDate
-    ? new Date(doc.dueDate).toLocaleDateString("de-DE")
-    : "";
+  const dueDate = doc.dueDate ? new Date(doc.dueDate).toLocaleDateString("de-DE") : "";
+  const issueDate = doc.issueDate ? new Date(doc.issueDate).toLocaleDateString("de-DE") : "";
   const zahlungshinweis =
     doc.documentType === "INVOICE" && doc.dueDate
-      ? `Bitte überweisen Sie den Betrag bis zum ${dueDate} auf unser Konto${
-          company.bankIban ? ` (IBAN: ${company.bankIban})` : ""
-        }.`
+      ? `Bitte überweisen Sie den Betrag bis zum ${dueDate} auf unser Konto${company.bankIban ? ` (IBAN: ${company.bankIban})` : ""}.`
       : "";
+  const mitarbeiterName = me ? `${me.firstName ?? ""} ${me.lastName ?? ""}`.trim() || me.fullName : "";
   return template
-    .replace(/\{\{anrede\}\}/g, anrede)
+    // Dokument
     .replace(/\{\{dokumentNummer\}\}/g, doc.documentNumber ?? "")
     .replace(/\{\{dokumentTyp\}\}/g, typeLabel)
-    .replace(/\{\{kundenName\}\}/g, customerName)
-    .replace(/\{\{betrag\}\}/g, formatEur(doc.totalGross))
+    .replace(/\{\{ausstellungsDatum\}\}/g, issueDate)
     .replace(/\{\{faelligkeitsDatum\}\}/g, dueDate)
+    .replace(/\{\{nettobetrag\}\}/g, formatEur(doc.subtotalNet))
+    .replace(/\{\{betrag\}\}/g, formatEur(doc.totalGross))
+    .replace(/\{\{zahlungshinweis\}\}/g, zahlungshinweis)
+    // Kunde
+    .replace(/\{\{anrede\}\}/g, anrede)
+    .replace(/\{\{kundenName\}\}/g, kundenName)
+    .replace(/\{\{kundenVorname\}\}/g, customer?.firstName ?? "")
+    .replace(/\{\{kundenNachname\}\}/g, customer?.lastName ?? "")
+    .replace(/\{\{kundenFirma\}\}/g, customer?.companyName ?? "")
+    .replace(/\{\{kundenEmail\}\}/g, customer?.email ?? "")
+    .replace(/\{\{kundenTelefon\}\}/g, customer?.phone ?? "")
+    .replace(/\{\{kundenStrasse\}\}/g, customer?.billStreet ?? "")
+    .replace(/\{\{kundenPlz\}\}/g, customer?.billZip ?? "")
+    .replace(/\{\{kundenOrt\}\}/g, customer?.billCity ?? "")
+    .replace(/\{\{kundenUstId\}\}/g, customer?.vatId ?? "")
+    // Firma
     .replace(/\{\{firmenName\}\}/g, company.name)
-    .replace(/\{\{zahlungshinweis\}\}/g, zahlungshinweis);
+    .replace(/\{\{firmenStrasse\}\}/g, company.street ?? "")
+    .replace(/\{\{firmenPlz\}\}/g, company.zip ?? "")
+    .replace(/\{\{firmenOrt\}\}/g, company.city ?? "")
+    .replace(/\{\{firmenEmail\}\}/g, company.email ?? "")
+    .replace(/\{\{firmenTelefon\}\}/g, company.phone ?? "")
+    .replace(/\{\{firmenIban\}\}/g, company.bankIban ?? "")
+    .replace(/\{\{firmenUstId\}\}/g, company.vatId ?? "")
+    // Mitarbeiter
+    .replace(/\{\{mitarbeiterName\}\}/g, mitarbeiterName)
+    .replace(/\{\{mitarbeiterVorname\}\}/g, me?.firstName ?? "")
+    .replace(/\{\{mitarbeiterNachname\}\}/g, me?.lastName ?? "")
+    .replace(/\{\{mitarbeiterEmail\}\}/g, me?.email ?? "")
+    .replace(/\{\{mitarbeiterTelefon\}\}/g, me?.phone ?? "")
+    .replace(/\{\{mitarbeiterMobil\}\}/g, me?.mobile ?? "");
 }
 
 // ─── Send E-Mail Modal ────────────────────────────────────────────────────────
 
 function SendEmailModal({
-  open, onClose, doc, company,
-}: { open: boolean; onClose: () => void; doc: Document; company: CompanySettings }) {
+  open, onClose, doc, company, me,
+}: { open: boolean; onClose: () => void; doc: Document; company: CompanySettings; me: User | null }) {
   const emailSettings = company.emailSettings ?? DEFAULT_EMAIL_SETTINGS;
   const customer = parseCustomer(doc);
   const customerDisplayName =
@@ -520,10 +552,10 @@ function SendEmailModal({
 
   const [to, setTo] = useState(customer?.email ?? "");
   const [subject, setSubject] = useState(() =>
-    resolvePlaceholders(emailSettings.defaultSubject, doc, company)
+    resolvePlaceholders(emailSettings.defaultSubject, doc, company, me)
   );
   const [body, setBody] = useState(() =>
-    resolvePlaceholders(emailSettings.defaultBody, doc, company)
+    resolvePlaceholders(emailSettings.defaultBody, doc, company, me)
   );
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message?: string } | null>(null);

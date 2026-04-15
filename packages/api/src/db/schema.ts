@@ -50,6 +50,10 @@ export const users = sqliteTable("users", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   fullName: text("full_name").notNull(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  phone: text("phone"),
+  mobile: text("mobile"),
   role: text("role").notNull().default("viewer"),
   isActive: int("is_active", { mode: "boolean" }).notNull().default(true),
   lastLoginAt: text("last_login_at"),
@@ -149,6 +153,7 @@ export const numberSeries = sqliteTable("number_series", {
   yearSegment: int("year_segment", { mode: "boolean" }).notNull().default(true),
   monthSegment: int("month_segment", { mode: "boolean" }).notNull().default(false),
   padding: int("padding").notNull().default(5),
+  format: text("format"),
   nextCounter: int("next_counter").notNull().default(1),
   lastResetAt: text("last_reset_at"),
   resetYearly: int("reset_yearly", { mode: "boolean" }).notNull().default(true),
@@ -199,6 +204,7 @@ export const documents = sqliteTable("documents", {
   einvoiceProfile: text("einvoice_profile"),
   leitwegId: text("leitweg_id"),
   globalDiscountPct: text("global_discount_pct").notNull().default("0.00"),
+  globalDiscountType: text("global_discount_type").notNull().default("pct"),
   layoutOverride: text("layout_override"),
   internalNotes: text("internal_notes"),
   createdBy: int("created_by").references(() => users.id),
@@ -224,6 +230,7 @@ export const documentLineItems = sqliteTable("document_line_items", {
   unit: text("unit").notNull().default("Stk"),
   unitPrice: text("unit_price").notNull().default("0.00"),
   discountPct: text("discount_pct").notNull().default("0.00"),
+  discountType: text("discount_type").notNull().default("pct"),
   taxRateId: int("tax_rate_id").references(() => taxRates.id),
   taxRatePct: text("tax_rate_pct").notNull().default("0.00"),
   lineNet: text("line_net").notNull().default("0.00"),
@@ -285,6 +292,11 @@ export const documentsRelations = relations(documents, ({ one, many }) => ({
     fields: [documents.customerId],
     references: [customers.id],
   }),
+  cancelsDocument: one(documents, {
+    fields: [documents.cancelsDocumentId],
+    references: [documents.id],
+    relationName: "cancellation",
+  }),
   lineItems: many(documentLineItems),
   taxLines: many(documentTaxLines),
   payments: many(payments),
@@ -335,7 +347,22 @@ export const documentFilesRelations = relations(documentFiles, ({ one }) => ({
   }),
 }));
 
-export const productsRelations = relations(products, ({ one }) => ({
+// ─── Product Price History ────────────────────────────────────────────────────
+
+export const productPriceHistory = sqliteTable("product_price_history", {
+  id:        int("id").primaryKey({ autoIncrement: true }),
+  productId: int("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  unitPrice: text("unit_price").notNull(),
+  validFrom: text("valid_from").notNull(),
+  validTo:   text("valid_to"),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+});
+
+export const productPriceHistoryRelations = relations(productPriceHistory, ({ one }) => ({
+  product: one(products, { fields: [productPriceHistory.productId], references: [products.id] }),
+}));
+
+export const productsRelations = relations(products, ({ one, many }) => ({
   taxRate: one(taxRates, {
     fields: [products.taxRateId],
     references: [taxRates.id],
@@ -344,6 +371,7 @@ export const productsRelations = relations(products, ({ one }) => ({
     fields: [products.categoryId],
     references: [productCategories.id],
   }),
+  priceHistory: many(productPriceHistory),
 }));
 
 export const taxRatesRelations = relations(taxRates, ({ many }) => ({

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
-import type { CompanySettings, TaxRate, PdfSettings, EmailSettings, DocumentType, DocumentLayoutSettings } from "@honeybill/shared";
+import type { CompanySettings, TaxRate, PdfSettings, EmailSettings, DocumentType, DocumentLayoutSettings, NumberSeries } from "@honeybill/shared";
 import {
   DEFAULT_PDF_SETTINGS, DEFAULT_LAYOUTS, UpdatePdfSettingsSchema, type UpdatePdfSettingsInput,
   DEFAULT_EMAIL_SETTINGS, UpdateEmailSettingsSchema, type UpdateEmailSettingsInput,
@@ -10,19 +10,27 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { UpdateCompanySettingsSchema, type UpdateCompanySettingsInput } from "@honeybill/shared";
 import { useEffect, useRef, useState, useMemo } from "react";
-import { Building2, CheckCircle, Percent, Plus, Trash2, FileText, Mail, Send, Eye, EyeOff } from "lucide-react";
+import { Building2, CheckCircle, Percent, Plus, Trash2, FileText, Mail, Send, Eye, EyeOff, Users, ShieldCheck, UserCog, BadgeCheck, Hash, History } from "lucide-react";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
 import { usePDF } from "@react-pdf/renderer";
 import { InvoicePDF } from "@/components/pdf/InvoiceTemplate";
-import type { Document as HBDocument } from "@honeybill/shared";
+import type { Document as HBDocument, User, UserRole } from "@honeybill/shared";
+import { CreateUserSchema, UpdateUserSchema } from "@honeybill/shared";
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-const TAB_LABELS = { company: "Firmendaten", taxrates: "Steuersätze", pdflayout: "PDF-Layout", email: "E-Mail" } as const;
+const TAB_LABELS = { company: "Firmendaten", taxrates: "Steuersätze", numbering: "Nummernkreise", pdflayout: "PDF-Layout", email: "E-Mail", users: "Benutzer" } as const;
 type Tab = keyof typeof TAB_LABELS;
 
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>("company");
+
+  const { data: me } = useQuery<User>({
+    queryKey: ["me"],
+    queryFn: () => api.get("/auth/me"),
+  });
+  const isAdmin = me?.role === "admin";
 
   return (
     <div className={`p-6 space-y-4 ${tab === "pdflayout" ? "max-w-6xl" : "max-w-3xl"}`} style={{ minWidth: 0 }}>
@@ -30,25 +38,30 @@ export function SettingsPage() {
 
       {/* Tab bar */}
       <div className="flex gap-1 border-b border-gray-200">
-        {(Object.keys(TAB_LABELS) as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
-              tab === t
-                ? "border-honey-500 text-honey-700"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {TAB_LABELS[t]}
-          </button>
-        ))}
+        {(Object.keys(TAB_LABELS) as Tab[]).map((t) => {
+          if (t === "users" && !isAdmin) return null;
+          return (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                tab === t
+                  ? "border-honey-500 text-honey-700"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {TAB_LABELS[t]}
+            </button>
+          );
+        })}
       </div>
 
       {tab === "company" && <CompanyTab />}
       {tab === "taxrates" && <TaxRatesTab />}
+      {tab === "numbering" && <NumberSeriesTab />}
       {tab === "pdflayout" && <PdfLayoutTab />}
       {tab === "email" && <EmailTab />}
+      {tab === "users" && isAdmin && <UsersTab currentUserId={me?.id ?? 0} />}
     </div>
   );
 }
@@ -222,7 +235,7 @@ const MOCK_NUMBER: Record<DocumentType, string> = {
 function mockDoc(docType: DocumentType): HBDocument {
   return {
     id: 0, documentType: docType, documentNumber: MOCK_NUMBER[docType], status: "FINAL",
-    customerId: 0, customerSnapshot: null, layoutOverride: null, globalDiscountPct: "0.00",
+    customerId: 0, customerSnapshot: null, layoutOverride: null, globalDiscountPct: "0.00", globalDiscountType: "pct" as const,
     issueDate: "2026-04-10", deliveryDate: docType === "DELIVERY_NOTE" ? "2026-04-11" : null, deliveryDateEnd: null,
     dueDate: docType === "INVOICE" ? "2026-05-10" : null, quoteValidUntil: docType === "QUOTE" ? "2026-05-10" : null,
     sourceDocumentId: null, cancelsDocumentId: null,
@@ -244,15 +257,15 @@ function mockDoc(docType: DocumentType): HBDocument {
     lineItems: [
       { id: 1, documentId: 0, position: 0, lineType: "ITEM", productId: null, productSnapshot: null,
         description: "Webentwicklung (Frontend)", quantity: "8", unit: "Std",
-        unitPrice: "120.00", discountPct: "0.00", taxRateId: 1, taxRatePct: "19.00",
+        unitPrice: "120.00", discountPct: "0.00", discountType: "pct" as const, taxRateId: 1, taxRatePct: "19.00",
         lineNet: "960.00", lineTax: "182.40", lineGross: "1142.40", createdAt: "" },
-      { id: 2, documentId: 0, position: 1, lineType: "ITEM", productId: null, productSnapshot: null,
+      { id: 2, documentId: 0, position: 1, lineType: "ITEM" as const, productId: null, productSnapshot: null,
         description: "Beratung & Konzeption", quantity: "4", unit: "Std",
-        unitPrice: "150.00", discountPct: "10.00", taxRateId: 1, taxRatePct: "19.00",
+        unitPrice: "150.00", discountPct: "10.00", discountType: "pct" as const, taxRateId: 1, taxRatePct: "19.00",
         lineNet: "540.00", lineTax: "102.60", lineGross: "642.60", createdAt: "" },
-      { id: 3, documentId: 0, position: 2, lineType: "ITEM", productId: null, productSnapshot: null,
+      { id: 3, documentId: 0, position: 2, lineType: "ITEM" as const, productId: null, productSnapshot: null,
         description: "Hosting (jährlich)", quantity: "1", unit: "Jahr",
-        unitPrice: "180.67", discountPct: "0.00", taxRateId: 1, taxRatePct: "19.00",
+        unitPrice: "180.67", discountPct: "0.00", discountType: "pct" as const, taxRateId: 1, taxRatePct: "19.00",
         lineNet: "180.67", lineTax: "34.33", lineGross: "215.00", createdAt: "" },
     ],
     taxLines: [
@@ -789,16 +802,21 @@ function EmailTab() {
             </div>
           </div>
           {/* Placeholder sidebar */}
-          <div className="w-56 shrink-0 border-l border-gray-100 pl-4">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Platzhalter</p>
-            <div className="space-y-2">
-              {EMAIL_PLACEHOLDERS.map((p) => (
-                <div key={p.key}>
-                  <span className="font-mono text-xs text-gray-700 block leading-tight">{p.key}</span>
-                  <span className="text-xs text-gray-400">{p.example}</span>
+          <div className="w-64 shrink-0 border-l border-gray-100 pl-4 space-y-4 overflow-y-auto max-h-[600px]">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Platzhalter</p>
+            {(["Dokument", "Kunde", "Firma", "Mitarbeiter"] as const).map((group) => (
+              <div key={group}>
+                <p className="text-xs font-semibold text-gray-700 mb-1">{group}</p>
+                <div className="space-y-1">
+                  {EMAIL_PLACEHOLDERS.filter((p) => p.group === group).map((p) => (
+                    <div key={p.key}>
+                      <span className="font-mono text-xs text-honey-700 block leading-tight">{p.key}</span>
+                      <span className="text-xs text-gray-400">{p.label}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -826,11 +844,13 @@ const TAX_CATEGORIES = [
 
 function TaxRatesTab() {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [showCreate, setShowCreate] = useState(false);
+  const [editing, setEditing] = useState<TaxRate | null>(null);
 
   const { data: taxRates, isLoading } = useQuery<TaxRate[]>({
     queryKey: ["tax-rates"],
-    queryFn: () => api.get("/tax-rates"),
+    queryFn: () => api.get("/tax-rates?active=true"),
   });
 
   const deleteTaxRate = useMutation({
@@ -869,7 +889,7 @@ function TaxRatesTab() {
               {(taxRates ?? []).map((tr) => (
                 <tr key={tr.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="table-cell font-medium">{tr.name}</td>
-                  <td className="table-cell text-right font-mono">{tr.ratePercent} %</td>
+                  <td className="table-cell text-right font-mono">{parseFloat(tr.ratePercent).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} %</td>
                   <td className="table-cell text-gray-500 text-xs">{tr.taxCategory}</td>
                   <td className="table-cell text-gray-500 text-xs">{tr.validFrom}</td>
                   <td className="table-cell text-gray-500 text-xs">{tr.validTo ?? "—"}</td>
@@ -881,13 +901,22 @@ function TaxRatesTab() {
                     )}
                   </td>
                   <td className="table-cell">
-                    <button
-                      onClick={() => deleteTaxRate.mutate(tr.id)}
-                      className="text-gray-300 hover:text-red-500 transition-colors p-1"
-                      title="Löschen"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setEditing(tr)}
+                        className="text-gray-300 hover:text-honey-600 transition-colors p-1"
+                        title="Bearbeiten"
+                      >
+                        <FileText size={14} />
+                      </button>
+                      <button
+                        onClick={async () => { if (await confirm(`Steuersatz "${tr.name}" löschen?`, { title: "Steuersatz löschen", confirmLabel: "Löschen" })) deleteTaxRate.mutate(tr.id); }}
+                        className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                        title="Löschen"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -904,6 +933,7 @@ function TaxRatesTab() {
       </div>
 
       <CreateTaxRateModal open={showCreate} onClose={() => setShowCreate(false)} />
+      {editing && <CreateTaxRateModal open onClose={() => setEditing(null)} existing={editing} />}
     </div>
   );
 }
@@ -919,78 +949,135 @@ interface TaxRateForm {
   isDefault: boolean;
 }
 
-function CreateTaxRateModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function CreateTaxRateModal({ open, onClose, existing }: {
+  open: boolean; onClose: () => void; existing?: TaxRate;
+}) {
   const qc = useQueryClient();
-  const [form, setForm] = useState<TaxRateForm>({
-    name: "",
-    ratePercent: "19.00",
-    taxCategory: "S",
-    validFrom: new Date().toISOString().slice(0, 10),
-    validTo: "",
-    isDefault: false,
+  const isEdit = !!existing;
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [form, setForm] = useState({
+    name: existing?.name ?? "",
+    taxCategory: existing?.taxCategory ?? "S",
+    ratePercent: existing?.ratePercent ?? "19.00",
+    validFrom: existing?.validFrom ?? today,
+    validTo: existing?.validTo ?? "",
+    isDefault: existing?.isDefault ?? false,
   });
   const [error, setError] = useState("");
+  const [newPeriod, setNewPeriod] = useState({ ratePercent: "", validFrom: today });
+  const [periodError, setPeriodError] = useState("");
 
-  const create = useMutation({
-    mutationFn: (data: TaxRateForm) =>
-      api.post("/tax-rates", {
-        ...data,
-        validTo: data.validTo || null,
-      }),
+  const { data: history, refetch: refetchHistory } = useQuery<TaxRate[]>({
+    queryKey: ["tax-rates-history", existing?.name],
+    queryFn: () => api.get(`/tax-rates?name=${encodeURIComponent(existing!.name)}`),
+    enabled: isEdit,
+  });
+
+  const save = useMutation({
+    mutationFn: () => {
+      if (isEdit) {
+        // PUT: nur Metadaten (name, taxCategory, isDefault) — nie ratePercent/validFrom/validTo
+        return api.put(`/tax-rates/${existing!.id}`, {
+          name: form.name,
+          taxCategory: form.taxCategory,
+          isDefault: form.isDefault,
+        });
+      }
+      return api.post("/tax-rates", {
+        name: form.name,
+        ratePercent: form.ratePercent,
+        taxCategory: form.taxCategory,
+        validFrom: form.validFrom,
+        validTo: form.validTo || null,
+        isDefault: form.isDefault,
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tax-rates"] });
+      qc.invalidateQueries({ queryKey: ["tax-rates-history"] });
       onClose();
-      setForm({ name: "", ratePercent: "19.00", taxCategory: "S", validFrom: new Date().toISOString().slice(0, 10), validTo: "", isDefault: false });
-      setError("");
     },
     onError: (e: Error) => setError(e.message),
   });
 
-  const field = (key: keyof TaxRateForm) => ({
+  const addPeriod = useMutation({
+    mutationFn: (data: { ratePercent: string; validFrom: string }) =>
+      api.post(`/tax-rates/${existing!.id}/successor`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tax-rates"] });
+      refetchHistory();
+      setPeriodError("");
+      setNewPeriod({ ratePercent: "", validFrom: today });
+    },
+    onError: (e: Error) => setPeriodError(e.message),
+  });
+
+  const deleteHistory = useMutation({
+    mutationFn: (id: number) => api.delete(`/tax-rates/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tax-rates"] });
+      refetchHistory();
+    },
+  });
+
+  const field = (key: keyof typeof form) => ({
     value: String(form[key]),
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setForm((f) => ({ ...f, [key]: e.target.value })),
   });
 
   return (
-    <Modal open={open} onClose={onClose} title="Neuer Steuersatz">
-      <form
-        onSubmit={(e) => { e.preventDefault(); create.mutate(form); }}
-        className="space-y-4"
-      >
+    <Modal open={open} onClose={onClose} title={isEdit ? "Steuersatz bearbeiten" : "Neuer Steuersatz"} size="xl">
+      <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
             <label className="label">Bezeichnung *</label>
             <input {...field("name")} required className="input" placeholder="z. B. Normalsatz 19%" />
           </div>
-          <div>
-            <label className="label">Steuersatz (%) *</label>
-            <input
-              {...field("ratePercent")}
-              required
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              className="input font-mono"
-            />
-          </div>
-          <div>
-            <label className="label">Kategorie (EN 16931) *</label>
-            <select {...field("taxCategory")} className="input">
-              {TAX_CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label">Gültig ab *</label>
-            <input {...field("validFrom")} required type="date" className="input" />
-          </div>
-          <div>
-            <label className="label">Gültig bis (leer = unbegrenzt)</label>
-            <input {...field("validTo")} type="date" className="input" />
-          </div>
+          {/* Im Bearbeiten-Modus: Satz und Gültig-ab als Nur-Lesen anzeigen */}
+          {isEdit ? (
+            <>
+              <div>
+                <label className="label">Aktueller Satz</label>
+                <p className="input bg-gray-50 text-gray-500 font-mono">
+                  {parseFloat(existing!.ratePercent).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} %
+                  <span className="text-xs ml-2 text-gray-400">(per Neue Periode ändern)</span>
+                </p>
+              </div>
+              <div>
+                <label className="label">Kategorie (EN 16931) *</label>
+                <select {...field("taxCategory")} className="input">
+                  {TAX_CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label className="label">Steuersatz (%) *</label>
+                <input {...field("ratePercent")} required type="number" step="0.01" min="0" max="100" className="input font-mono" />
+              </div>
+              <div>
+                <label className="label">Kategorie (EN 16931) *</label>
+                <select {...field("taxCategory")} className="input">
+                  {TAX_CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">Gültig ab *</label>
+                <input {...field("validFrom")} required type="date" className="input" />
+              </div>
+              <div>
+                <label className="label">Gültig bis (leer = unbegrenzt)</label>
+                <input {...field("validTo")} type="date" className="input" />
+              </div>
+            </>
+          )}
         </div>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -1004,9 +1091,585 @@ function CreateTaxRateModal({ open, onClose }: { open: boolean; onClose: () => v
         {error && <p className="text-red-500 text-sm">{error}</p>}
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="btn-secondary">Abbrechen</button>
-          <button type="submit" disabled={create.isPending} className="btn-primary">
+          <button type="submit" disabled={save.isPending} className="btn-primary">
             <Percent size={14} />
-            {create.isPending ? "Speichern…" : "Speichern"}
+            {save.isPending ? "Speichern…" : "Speichern"}
+          </button>
+        </div>
+      </form>
+
+      {/* Historie + Neue Periode – nur im Bearbeitungsmodus */}
+      {isEdit && (
+        <div className="mt-6 pt-5 border-t border-gray-100 space-y-4">
+          <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+            <History size={14} /> Gültigkeitshistorie
+          </h4>
+
+          <div className="overflow-hidden rounded border border-gray-100">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="table-header">Satz</th>
+                  <th className="table-header">Gültig ab</th>
+                  <th className="table-header">Gültig bis</th>
+                  <th className="table-header"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {(history ?? []).slice().reverse().map((h) => {
+                  const isFuture = h.validFrom > today;
+                  const isCurrent = h.id === existing?.id;
+                  return (
+                    <tr key={h.id} className={`border-b border-gray-50 ${isCurrent ? "bg-honey-50" : ""}`}>
+                      <td className="table-cell font-mono font-medium">
+                        {parseFloat(h.ratePercent).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} %
+                      </td>
+                      <td className="table-cell text-gray-500">{h.validFrom}</td>
+                      <td className="table-cell text-gray-500">
+                        {h.validTo
+                          ? h.validTo
+                          : isFuture
+                            ? <span className="text-blue-500 font-medium">geplant</span>
+                            : <span className="text-green-600 font-medium">aktiv</span>
+                        }
+                      </td>
+                      <td className="table-cell">
+                        <button
+                          type="button"
+                          onClick={() => deleteHistory.mutate(h.id)}
+                          className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                          title="Eintrag löschen"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {!history?.length && (
+                  <tr><td colSpan={4} className="table-cell text-center text-gray-400 py-4">Keine Einträge</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Neue Periode hinzufügen */}
+          <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+            <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Neue Periode ab Datum</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Neuer Satz (%)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={newPeriod.ratePercent}
+                  onChange={(e) => setNewPeriod((p) => ({ ...p, ratePercent: e.target.value }))}
+                  className="input font-mono"
+                  placeholder="7.70"
+                />
+              </div>
+              <div>
+                <label className="label">Gültig ab *</label>
+                <input
+                  type="date"
+                  value={newPeriod.validFrom}
+                  onChange={(e) => setNewPeriod((p) => ({ ...p, validFrom: e.target.value }))}
+                  className="input"
+                />
+              </div>
+            </div>
+            {periodError && <p className="text-red-500 text-xs">{periodError}</p>}
+            <div className="text-xs text-gray-400">
+              Der aktuelle Satz wird automatisch zum Vortag abgeschlossen.
+            </div>
+            <button
+              type="button"
+              disabled={!newPeriod.ratePercent || !newPeriod.validFrom || addPeriod.isPending}
+              onClick={() => addPeriod.mutate(newPeriod)}
+              className="btn-secondary text-sm"
+            >
+              <Plus size={13} />
+              {addPeriod.isPending ? "Wird gespeichert…" : "Periode hinzufügen"}
+            </button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ─── Users Tab ────────────────────────────────────────────────────────────────
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  admin: "Administrator",
+  accountant: "Buchhalter",
+  viewer: "Betrachter",
+};
+
+// ─── Number Series Tab ────────────────────────────────────────────────────────
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  INVOICE: "Rechnung",
+  QUOTE: "Angebot",
+  DELIVERY_NOTE: "Lieferschein",
+  CREDIT_NOTE: "Gutschrift",
+};
+
+const FORMAT_VARS = [
+  { key: "{YYYY}", label: "Vierstelliges Jahr", example: "2026" },
+  { key: "{YY}", label: "Zweistelliges Jahr", example: "26" },
+  { key: "{MM}", label: "Monat", example: "04" },
+  { key: "{NNNNN}", label: "Zähler (5 Stellen)", example: "00001" },
+  { key: "{NNN}", label: "Zähler (3 Stellen)", example: "001" },
+  { key: "{N}", label: "Zähler (keine Auffüllung)", example: "1" },
+];
+
+function NumberSeriesTab() {
+  const qc = useQueryClient();
+  const { data: series = [], isLoading } = useQuery<NumberSeries[]>({
+    queryKey: ["number-series"],
+    queryFn: () => api.get("/number-series"),
+  });
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-500">
+        Legen Sie das Format für Belegnummern fest. Verwenden Sie Variablen wie <code className="font-mono text-xs bg-gray-100 px-1 rounded">{"{YYYY}"}</code>, <code className="font-mono text-xs bg-gray-100 px-1 rounded">{"{MM}"}</code> und <code className="font-mono text-xs bg-gray-100 px-1 rounded">{"{NNNNN}"}</code> (Anzahl N = Stellen mit führenden Nullen).
+      </p>
+      {isLoading ? (
+        <div className="p-8 text-center text-gray-400">Laden…</div>
+      ) : (
+        <div className="space-y-4">
+          {series.map((s) => (
+            <NumberSeriesCard key={s.documentType} series={s} onSaved={() => qc.invalidateQueries({ queryKey: ["number-series"] })} />
+          ))}
+        </div>
+      )}
+      {/* Variable reference */}
+      <div className="card p-4">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Verfügbare Variablen</p>
+        <div className="grid grid-cols-2 gap-2">
+          {FORMAT_VARS.map((v) => (
+            <div key={v.key} className="flex items-center gap-3">
+              <code className="font-mono text-xs text-honey-700 bg-honey-50 px-2 py-0.5 rounded min-w-[80px]">{v.key}</code>
+              <span className="text-xs text-gray-500">{v.label} <span className="text-gray-400">({v.example})</span></span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NumberSeriesCard({ series, onSaved }: { series: NumberSeries; onSaved: () => void }) {
+  const defaultFormat = (() => {
+    if (series.format) return series.format;
+    const padStr = "N".repeat(series.padding || 5);
+    let mid = "";
+    if (series.yearSegment && series.monthSegment) mid = "{YYYY}-{MM}-";
+    else if (series.yearSegment) mid = "{YYYY}-";
+    else if (series.monthSegment) mid = "{MM}-";
+    return `${series.prefix}${mid}{${padStr}}${series.suffix}`;
+  })();
+
+  const [format, setFormat] = useState(defaultFormat);
+  const [nextCounter, setNextCounter] = useState(String(series.nextCounter));
+  const [resetYearly, setResetYearly] = useState(series.resetYearly);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+
+  const hasNPlaceholder = /\{N+\}/.test(format);
+
+  const fetchPreview = async (fmt: string) => {
+    try {
+      const res = await api.post(`/number-series/${series.documentType}/preview`, { format: fmt });
+      setPreview((res as any).preview);
+    } catch {
+      setPreview(null);
+    }
+  };
+
+  const handleFormatChange = (val: string) => {
+    setFormat(val);
+    if (/\{N+\}/.test(val)) fetchPreview(val);
+    else setPreview(null);
+  };
+
+  const handleSave = async () => {
+    if (!hasNPlaceholder) { setError("Format muss mindestens einen Zähler-Platzhalter enthalten (z.B. {NNNNN})"); return; }
+    setError("");
+    setSaving(true);
+    try {
+      await api.put(`/number-series/${series.documentType}`, {
+        format,
+        nextCounter: Number(nextCounter),
+        resetYearly,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      onSaved();
+    } catch (e: any) {
+      setError(e?.message ?? "Fehler beim Speichern");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="card p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <Hash size={16} className="text-honey-500" />
+        <h3 className="font-semibold text-gray-900">{DOC_TYPE_LABELS[series.documentType] ?? series.documentType}</h3>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="col-span-2">
+          <label className="label">Format</label>
+          <input
+            className={`input font-mono ${!hasNPlaceholder && format ? "border-red-300 bg-red-50" : ""}`}
+            value={format}
+            onChange={(e) => handleFormatChange(e.target.value)}
+            placeholder="z.B. RE-{YYYY}-{NNNNN}"
+          />
+          {preview && (
+            <p className="text-xs text-gray-500 mt-1">
+              Vorschau: <span className="font-mono font-semibold text-honey-700">{preview}</span>
+            </p>
+          )}
+          {!hasNPlaceholder && format && (
+            <p className="text-xs text-red-500 mt-1">Kein Zähler-Platzhalter gefunden (z.B. {"{NNNNN}"})</p>
+          )}
+        </div>
+        <div>
+          <label className="label">Nächste Nummer</label>
+          <input
+            className="input"
+            type="number"
+            min={1}
+            value={nextCounter}
+            onChange={(e) => setNextCounter(e.target.value)}
+          />
+        </div>
+        <div className="flex items-end pb-1">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={resetYearly}
+              onChange={(e) => setResetYearly(e.target.checked)}
+              className="rounded"
+            />
+            <span className="text-sm text-gray-700">Jährlich zurücksetzen</span>
+          </label>
+        </div>
+      </div>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="flex items-center gap-3">
+        <button onClick={handleSave} disabled={saving || !hasNPlaceholder} className="btn-primary">
+          {saving ? "Speichern…" : "Speichern"}
+        </button>
+        {saved && <span className="flex items-center gap-1 text-green-600 text-sm"><CheckCircle size={14} /> Gespeichert</span>}
+      </div>
+    </div>
+  );
+}
+
+const ROLE_ICONS: Record<UserRole, React.ReactNode> = {
+  admin: <ShieldCheck size={13} className="text-red-500" />,
+  accountant: <UserCog size={13} className="text-honey-600" />,
+  viewer: <BadgeCheck size={13} className="text-gray-400" />,
+};
+
+function UsersTab({ currentUserId }: { currentUserId: number }) {
+  const qc = useQueryClient();
+  const confirm = useConfirm();
+  const [showCreate, setShowCreate] = useState(false);
+  const [editing, setEditing] = useState<User | null>(null);
+
+  const { data: userList = [] } = useQuery<User[]>({
+    queryKey: ["users"],
+    queryFn: () => api.get("/users"),
+  });
+
+  const deactivate = useMutation({
+    mutationFn: (id: number) => api.delete(`/users/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+  });
+
+  const reactivate = useMutation({
+    mutationFn: (id: number) => api.put(`/users/${id}`, { isActive: true }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-900">Benutzer</h2>
+          <p className="text-xs text-gray-400 mt-0.5">Zugänge verwalten und Rollen vergeben</p>
+        </div>
+        <button onClick={() => setShowCreate(true)} className="btn-primary text-sm">
+          <Plus size={14} /> Benutzer hinzufügen
+        </button>
+      </div>
+
+      <div className="card overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name / E-Mail</th>
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Rolle</th>
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Letzter Login</th>
+              <th className="px-4 py-2.5" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {userList.map((u) => (
+              <tr key={u.id} className={`hover:bg-gray-50 transition-colors ${!u.isActive ? "opacity-50" : ""}`}>
+                <td className="px-4 py-3">
+                  <div className="font-medium text-gray-900">
+                    {u.firstName || u.lastName
+                      ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim()
+                      : u.fullName}
+                  </div>
+                  <div className="text-xs text-gray-400">{u.email}</div>
+                </td>
+                <td className="px-4 py-3">
+                  <span className="flex items-center gap-1.5">
+                    {ROLE_ICONS[u.role as UserRole]}
+                    {ROLE_LABELS[u.role as UserRole]}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                    u.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                  }`}>
+                    {u.isActive ? "Aktiv" : "Deaktiviert"}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-xs text-gray-400">
+                  {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString("de-DE") : "—"}
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1 justify-end">
+                    <button
+                      onClick={() => setEditing(u)}
+                      className="btn-secondary text-xs py-1 px-2"
+                    >
+                      Bearbeiten
+                    </button>
+                    {u.id !== currentUserId && (
+                      u.isActive ? (
+                        <button
+                          onClick={async () => { const name = u.firstName || u.lastName ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() : u.fullName; if (await confirm(`${name} deaktivieren?`, { title: "Benutzer deaktivieren", confirmLabel: "Deaktivieren" })) deactivate.mutate(u.id); }}
+                          className="btn-danger text-xs py-1 px-2"
+                        >
+                          Deaktivieren
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => reactivate.mutate(u.id)}
+                          className="btn-secondary text-xs py-1 px-2"
+                        >
+                          Reaktivieren
+                        </button>
+                      )
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {showCreate && (
+        <UserFormModal
+          onClose={() => setShowCreate(false)}
+          onSaved={() => { qc.invalidateQueries({ queryKey: ["users"] }); setShowCreate(false); }}
+        />
+      )}
+      {editing && (
+        <UserFormModal
+          user={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => { qc.invalidateQueries({ queryKey: ["users"] }); setEditing(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function UserFormModal({
+  user,
+  onClose,
+  onSaved,
+}: {
+  user?: User;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const isEdit = !!user;
+  const [form, setForm] = useState({
+    email: user?.email ?? "",
+    firstName: user?.firstName ?? "",
+    lastName: user?.lastName ?? "",
+    phone: user?.phone ?? "",
+    mobile: user?.mobile ?? "",
+    role: (user?.role ?? "viewer") as UserRole,
+    password: "",
+    passwordConfirm: "",
+  });
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!isEdit || form.password) {
+      if (form.password !== form.passwordConfirm) {
+        setError("Passwörter stimmen nicht überein");
+        return;
+      }
+      if (form.password.length < 8) {
+        setError("Passwort muss mindestens 8 Zeichen haben");
+        return;
+      }
+    }
+
+    setSaving(true);
+    try {
+      const fullName = `${form.firstName} ${form.lastName}`.trim() || form.firstName || form.lastName || form.email;
+      if (isEdit) {
+        const patch: Record<string, unknown> = {
+          email: form.email,
+          fullName,
+          firstName: form.firstName || null,
+          lastName: form.lastName || null,
+          phone: form.phone || null,
+          mobile: form.mobile || null,
+          role: form.role,
+        };
+        if (form.password) patch.password = form.password;
+        await api.put(`/users/${user.id}`, patch);
+      } else {
+        await api.post("/users", {
+          email: form.email,
+          fullName,
+          firstName: form.firstName || null,
+          lastName: form.lastName || null,
+          phone: form.phone || null,
+          mobile: form.mobile || null,
+          role: form.role,
+          password: form.password,
+        });
+      }
+      onSaved();
+    } catch (err: any) {
+      setError(err?.message ?? "Fehler beim Speichern");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title={isEdit ? "Benutzer bearbeiten" : "Benutzer hinzufügen"} size="sm">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="label">E-Mail-Adresse</label>
+          <input
+            className="input"
+            type="email"
+            required
+            value={form.email}
+            onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Vorname</label>
+            <input
+              className="input"
+              value={form.firstName}
+              onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="label">Nachname</label>
+            <input
+              className="input"
+              value={form.lastName}
+              onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Telefon (Festnetz)</label>
+            <input
+              className="input"
+              type="tel"
+              value={form.phone}
+              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="label">Mobilnummer</label>
+            <input
+              className="input"
+              type="tel"
+              value={form.mobile}
+              onChange={(e) => setForm((f) => ({ ...f, mobile: e.target.value }))}
+            />
+          </div>
+        </div>
+        <div>
+          <label className="label">Rolle</label>
+          <select className="input" value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as UserRole }))}>
+            <option value="viewer">Betrachter</option>
+            <option value="accountant">Buchhalter</option>
+            <option value="admin">Administrator</option>
+          </select>
+        </div>
+        <div>
+          <label className="label">{isEdit ? "Neues Passwort (leer = unverändert)" : "Passwort"}</label>
+          <div className="relative">
+            <input
+              className="input pr-10"
+              type={showPw ? "text" : "password"}
+              required={!isEdit}
+              value={form.password}
+              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+              placeholder={isEdit ? "Leer lassen für keine Änderung" : ""}
+            />
+            <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute right-2 top-2 text-gray-400 hover:text-gray-600">
+              {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+        </div>
+        {(!isEdit || form.password) && (
+          <div>
+            <label className="label">Passwort bestätigen</label>
+            <input
+              className="input"
+              type={showPw ? "text" : "password"}
+              required={!isEdit}
+              value={form.passwordConfirm}
+              onChange={(e) => setForm((f) => ({ ...f, passwordConfirm: e.target.value }))}
+            />
+          </div>
+        )}
+        {error && <p className="text-red-500 text-sm">{error}</p>}
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" onClick={onClose} className="btn-secondary">Abbrechen</button>
+          <button type="submit" disabled={saving} className="btn-primary">
+            <Users size={14} />
+            {saving ? "Speichern…" : "Speichern"}
           </button>
         </div>
       </form>

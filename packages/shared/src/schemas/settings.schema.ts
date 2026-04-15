@@ -20,12 +20,14 @@ export const UpdateCompanySettingsSchema = z.object({
 });
 
 export const UpdateNumberSeriesSchema = z.object({
-  prefix: z.string().max(20).default(""),
-  suffix: z.string().max(20).default(""),
-  yearSegment: z.boolean().default(true),
-  monthSegment: z.boolean().default(false),
-  padding: z.number().int().min(1).max(10).default(5),
-  resetYearly: z.boolean().default(true),
+  prefix: z.string().max(20).optional(),
+  suffix: z.string().max(20).optional(),
+  yearSegment: z.boolean().optional(),
+  monthSegment: z.boolean().optional(),
+  padding: z.number().int().min(1).max(10).optional(),
+  format: z.string().max(100).nullable().optional(),
+  nextCounter: z.number().int().min(1).optional(),
+  resetYearly: z.boolean().optional(),
 });
 
 const DocumentLayoutSettingsSchema = z.object({
@@ -83,8 +85,33 @@ export const SendDocumentEmailSchema = z.object({
   attachPdf: z.boolean().default(true),
 });
 
+export const CreateUserSchema = z.object({
+  email: z.string().email(),
+  fullName: z.string().min(1).max(200),
+  firstName: z.string().max(100).nullable().optional(),
+  lastName: z.string().max(100).nullable().optional(),
+  phone: z.string().max(50).nullable().optional(),
+  mobile: z.string().max(50).nullable().optional(),
+  role: z.enum(["admin", "accountant", "viewer"]).default("viewer"),
+  password: z.string().min(8).max(200),
+});
+
+export const UpdateUserSchema = z.object({
+  email: z.string().email().optional(),
+  fullName: z.string().min(1).max(200).optional(),
+  firstName: z.string().max(100).nullable().optional(),
+  lastName: z.string().max(100).nullable().optional(),
+  phone: z.string().max(50).nullable().optional(),
+  mobile: z.string().max(50).nullable().optional(),
+  role: z.enum(["admin", "accountant", "viewer"]).optional(),
+  isActive: z.boolean().optional(),
+  password: z.string().min(8).max(200).optional(),
+});
+
 export type UpdateCompanySettingsInput = z.infer<typeof UpdateCompanySettingsSchema>;
 export type UpdateNumberSeriesInput = z.infer<typeof UpdateNumberSeriesSchema>;
 export type UpdatePdfSettingsInput = z.infer<typeof UpdatePdfSettingsSchema>;
 export type UpdateEmailSettingsInput = z.infer<typeof UpdateEmailSettingsSchema>;
 export type SendDocumentEmailInput = z.infer<typeof SendDocumentEmailSchema>;
+export type CreateUserInput = z.infer<typeof CreateUserSchema>;
+export type UpdateUserInput = z.infer<typeof UpdateUserSchema>;
