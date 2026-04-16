@@ -137,9 +137,21 @@ export function DocumentEditorPage() {
       if (typeof raw === "string") { try { return JSON.parse(raw); } catch { return null; } }
       return raw;
     })();
-    setClosingText(lo?.closingText ?? "");
+    setClosingText(lo?.closingText ?? DEFAULT_LAYOUTS[doc.documentType as DocumentType]?.closingText ?? "");
     setLayoutOverride(lo ? { ...lo, closingText: undefined } : null);
   }, [doc?.id]); // only on doc id change, not every render
+
+  // Once company settings load, refine default closing text (company may override DEFAULT_LAYOUTS)
+  useEffect(() => {
+    if (!company || !doc) return;
+    setClosingText((prev) => {
+      // Only update if the current value matches a DEFAULT_LAYOUTS default (not user-edited or explicitly set override)
+      const lo = (() => { const raw = (doc as any).layoutOverride; if (!raw) return null; if (typeof raw === "string") { try { return JSON.parse(raw); } catch { return null; } } return raw; })();
+      if (lo?.closingText) return prev; // explicit override — keep
+      const companyDefault = (company?.pdfSettings?.layouts?.[doc.documentType] as any)?.closingText;
+      return companyDefault ?? prev;
+    });
+  }, [company?.pdfSettings, doc?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Totals
   const rawSubtotalNet = rows
