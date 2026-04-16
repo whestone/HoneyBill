@@ -381,7 +381,7 @@ export function DocumentDetailPage() {
                           <StatusBadge status={rel.status as any} />
                         </td>
                         <td className={`table-cell text-right font-medium ${isCreditNote ? "text-red-600" : ""}`}>
-                          {isCreditNote ? "−" : ""}{formatEur(rel.totalGross)}
+                          {formatEur(rel.totalGross)}
                         </td>
                       </tr>
                     );
