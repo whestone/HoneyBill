@@ -160,6 +160,19 @@ export async function documentRoutes(app: FastifyInstance) {
     return reply.send({ ok: true });
   });
 
+  // PATCH /api/v1/documents/:id/notes — update internalNotes regardless of status
+  app.patch("/:id/notes", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { internalNotes } = req.body as { internalNotes: string | null };
+    const doc = await db.query.documents.findFirst({ where: eq(documents.id, Number(id)) });
+    if (!doc) return reply.status(404).send({ message: "Beleg nicht gefunden" });
+    await db
+      .update(documents)
+      .set({ internalNotes: internalNotes ?? null, updatedAt: new Date().toISOString() })
+      .where(eq(documents.id, Number(id)));
+    return reply.send({ ok: true });
+  });
+
   // POST /api/v1/documents/:id/cancel
   // Cancels a finalized document by creating an auto-finalized counter-document with negated amounts:
   // INVOICE → CREDIT_NOTE (negative), CREDIT_NOTE → INVOICE (double-negation = positive)
