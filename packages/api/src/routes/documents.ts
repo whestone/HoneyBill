@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import Decimal from "decimal.js";
 import { db } from "../db/index.js";
 import { documentFiles, documentLineItems, documentTaxLines, documents, payments } from "../db/schema.js";
@@ -334,35 +334,52 @@ export async function documentRoutes(app: FastifyInstance) {
   });
 
   // GET /api/v1/documents/:id/related
+  // BFS traversal: walks the full chain in both directions (parents + children)
+  // so that even deep storno chains (A→B→C→D) are fully returned from any node.
   app.get("/:id/related", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    const numId = Number(id);
+    const startId = Number(id);
 
-    // Fetch the current doc to find its parents
-    const self = await db.query.documents.findFirst({ where: eq(documents.id, numId) });
-    if (!self) return reply.send([]);
+    const visited = new Set<number>([startId]);
+    const queue: number[] = [startId];
 
-    const parentIds = [self.sourceDocumentId, self.cancelsDocumentId].filter((x): x is number => x != null);
+    while (queue.length > 0) {
+      const current = queue.shift()!;
 
-    // Build OR conditions: children, parents, siblings (share a parent with this doc)
-    const conditions = [
-      or(eq(documents.sourceDocumentId, numId), eq(documents.cancelsDocumentId, numId)),
-    ];
-    if (parentIds.length > 0) {
-      conditions.push(inArray(documents.id, parentIds));
-      conditions.push(or(
-        inArray(documents.sourceDocumentId, parentIds),
-        inArray(documents.cancelsDocumentId, parentIds),
-      ) as any);
+      // Fetch parents: docs that this doc references
+      const doc = await db.query.documents.findFirst({
+        where: eq(documents.id, current),
+        columns: { id: true, sourceDocumentId: true, cancelsDocumentId: true },
+      });
+      if (doc) {
+        for (const pid of [doc.sourceDocumentId, doc.cancelsDocumentId]) {
+          if (pid != null && !visited.has(pid)) {
+            visited.add(pid);
+            queue.push(pid);
+          }
+        }
+      }
+
+      // Fetch children: docs that reference this doc
+      const children = await db.query.documents.findMany({
+        where: or(eq(documents.sourceDocumentId, current), eq(documents.cancelsDocumentId, current)),
+        columns: { id: true },
+      });
+      for (const child of children) {
+        if (!visited.has(child.id)) {
+          visited.add(child.id);
+          queue.push(child.id);
+        }
+      }
     }
 
+    visited.delete(startId);
+    if (visited.size === 0) return reply.send([]);
+
     const rows = await db.query.documents.findMany({
-      where: and(
-        sql`${documents.id} != ${numId}`,
-        or(...conditions),
-      ),
+      where: inArray(documents.id, Array.from(visited)),
       with: { customer: true },
-      orderBy: [desc(documents.createdAt)],
+      orderBy: [asc(documents.createdAt)],
     });
     return reply.send(rows);
   });
