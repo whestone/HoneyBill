@@ -70,7 +70,7 @@ app.get("/health", async () => ({ status: "ok", version: "0.1.0" }));
 
 // ─── Error Handler ────────────────────────────────────────────────────────────
 
-app.setErrorHandler((error, _req, reply) => {
+app.setErrorHandler((error: Error & { statusCode?: number }, _req, reply) => {
   app.log.error(error);
   if (error.name === "ZodError") {
     return reply.status(400).send({ message: "Validierungsfehler", errors: error.message });

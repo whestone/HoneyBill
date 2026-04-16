@@ -14,7 +14,22 @@
       "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
       "Bash(pnpm --filter @honeybill/api tsx src/db/seed.ts)",
       "Bash(npx tsx:*)",
-      "Bash(pnpm --filter @honeybill/web add buffer)"
+      "Bash(pnpm --filter @honeybill/web add buffer)",
+      "Bash(gh pr create --title 'HoneyBill initial implementation' --body ':*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(git push:*)",
+      "Bash(gh pr create --title 'feat: Offene Posten, Verknüpfte Belege & PDF-Layouteditor' --body ':*)",
+      "Bash(pnpm --filter @honeybill/web build)",
+      "Bash(pnpm --filter @honeybill/api add -D cross-env)",
+      "mcp__plugin_context-mode_context-mode__ctx_search",
+      "Bash(pnpm --filter @honeybill/api add nodemailer)",
+      "Bash(pnpm --filter @honeybill/api add -D @types/nodemailer)",
+      "Bash(pnpm --filter @honeybill/api migrate)",
+      "Bash(gh pr create --title 'feat: E-Mail-Versand, PDF-Layouteditor, verknüpfte Belege & Bugfixes' --body ':*)",
+      "Bash(where gh:*)",
+      "Bash(winget list:*)",
+      "mcp__plugin_context-mode_context-mode__ctx_stats"
     ]
   }
 }

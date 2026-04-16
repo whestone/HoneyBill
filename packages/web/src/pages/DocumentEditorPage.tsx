@@ -27,6 +27,7 @@ import { TypeBadge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { PdfPreview } from "@/components/pdf/PdfPreview";
+import { DecimalInput } from "@/components/ui/DecimalInput";
 import type { DocumentType, CompanySettings } from "@honeybill/shared";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -506,15 +507,11 @@ export function DocumentEditorPage() {
           <div>
             <label className="label">Gesamtrabatt</label>
             <div className="flex gap-1">
-              <input
-                type="number"
+              <DecimalInput
                 className="input text-sm flex-1 min-w-0"
-                min={0}
-                max={globalDiscountType === "pct" ? 100 : undefined}
-                step={0.01}
                 value={globalDiscountPct}
-                onChange={(e) => { setGlobalDiscountPct(e.target.value); setDirty(true); }}
-                placeholder="0.00"
+                onChange={(v) => { setGlobalDiscountPct(v); setDirty(true); }}
+                placeholder="0,00"
               />
               <div className="flex rounded border border-gray-300 overflow-hidden text-xs">
                 <button
@@ -648,13 +645,10 @@ function LineItemRow({ row, idx, taxRates, onChange, onRemove, onProductSelect }
         </div>
 
         {/* Quantity */}
-        <input
+        <DecimalInput
           className="text-sm text-right bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-honey-300 rounded px-1 py-0.5"
           value={row.quantity}
-          onChange={(e) => onChange({ quantity: e.target.value })}
-          type="number"
-          min="0"
-          step="1"
+          onChange={(v) => onChange({ quantity: v })}
         />
 
         {/* Unit */}
@@ -665,25 +659,18 @@ function LineItemRow({ row, idx, taxRates, onChange, onRemove, onProductSelect }
         />
 
         {/* Unit price */}
-        <input
+        <DecimalInput
           className="text-sm text-right bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-honey-300 rounded px-1 py-0.5 font-mono"
           value={row.unitPrice}
-          onChange={(e) => onChange({ unitPrice: e.target.value })}
-          type="number"
-          min="0"
-          step="0.01"
+          onChange={(v) => onChange({ unitPrice: v })}
         />
 
         {/* Discount + type toggle */}
         <div className="flex items-center gap-0.5">
-          <input
+          <DecimalInput
             className="text-sm text-right bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-honey-300 rounded px-1 py-0.5 w-12"
             value={row.discountPct}
-            onChange={(e) => onChange({ discountPct: e.target.value })}
-            type="number"
-            min="0"
-            max={row.discountType === "pct" ? 100 : undefined}
-            step="0.01"
+            onChange={(v) => onChange({ discountPct: v })}
           />
           <div className="flex rounded border border-gray-200 overflow-hidden text-xs">
             <button type="button"

@@ -23,7 +23,8 @@ import { ArrowLeft, CheckCircle, CreditCard, Edit2, FileText, Send, Truck, Trash
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { pdf } from "@react-pdf/renderer";
 import { InvoicePDF } from "@/components/pdf/InvoiceTemplate";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
+import { DecimalInput } from "@/components/ui/DecimalInput";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreatePaymentSchema, type CreatePaymentInput } from "@honeybill/shared";
 
@@ -380,7 +381,7 @@ export function DocumentDetailPage() {
                           <StatusBadge status={rel.status as any} />
                         </td>
                         <td className={`table-cell text-right font-medium ${isCreditNote ? "text-red-600" : ""}`}>
-                          {isCreditNote ? "−" : ""}{formatEur(rel.totalGross)}
+                          {formatEur(rel.totalGross)}
                         </td>
                       </tr>
                     );
@@ -664,7 +665,7 @@ function AddPaymentModal({
   openAmount: number;
 }) {
   const addPayment = useAddPayment(docId);
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<CreatePaymentInput>({
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<CreatePaymentInput>({
     resolver: zodResolver(CreatePaymentSchema),
     defaultValues: {
       paymentDate: new Date().toISOString().slice(0, 10),
@@ -687,7 +688,13 @@ function AddPaymentModal({
           </div>
           <div>
             <label className="label">Betrag (€)</label>
-            <input {...register("amount")} type="number" step="0.01" min="0.01" className="input" />
+            <Controller
+              name="amount"
+              control={control}
+              render={({ field }) => (
+                <DecimalInput value={field.value} onChange={field.onChange} className="input" />
+              )}
+            />
             {errors.amount && <p className="text-red-500 text-xs mt-1">{errors.amount.message}</p>}
           </div>
           <div>

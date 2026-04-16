@@ -5,7 +5,8 @@ import { useProducts, useCreateProduct, useDeleteProduct, useTaxRates } from "@/
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
-import { formatEur, parseDecimalInput } from "@honeybill/shared";
+import { formatEur } from "@honeybill/shared";
+import { DecimalInput } from "@/components/ui/DecimalInput";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 
@@ -144,7 +145,7 @@ function ProductForm({
   });
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit({ ...form, unitPrice: parseDecimalInput(form.unitPrice) }); }} className="space-y-4">
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="label">SKU *</label>
@@ -160,14 +161,12 @@ function ProductForm({
         </div>
         <div>
           <label className="label">Preis (netto, €) *</label>
-          <input
-            {...field("unitPrice")}
-            type="text"
-            inputMode="decimal"
+          <DecimalInput
+            value={form.unitPrice}
+            onChange={(v) => setForm((f) => ({ ...f, unitPrice: v }))}
             required
             className="input font-mono"
             placeholder="0,00"
-            onBlur={(e) => setForm((f) => ({ ...f, unitPrice: parseDecimalInput(e.target.value) }))}
           />
         </div>
         <div>
@@ -377,12 +376,9 @@ function EditProductModal({ product, onClose }: { product: Product; onClose: () 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Neuer Preis (netto, €)</label>
-              <input
-                type="text"
-                inputMode="decimal"
+              <DecimalInput
                 value={newPeriod.unitPrice}
-                onChange={(e) => setNewPeriod((p) => ({ ...p, unitPrice: e.target.value }))}
-                onBlur={(e) => setNewPeriod((p) => ({ ...p, unitPrice: parseDecimalInput(e.target.value) }))}
+                onChange={(v) => setNewPeriod((p) => ({ ...p, unitPrice: v }))}
                 className="input font-mono"
                 placeholder="0,00"
               />
@@ -404,7 +400,7 @@ function EditProductModal({ product, onClose }: { product: Product; onClose: () 
           <button
             type="button"
             disabled={!newPeriod.unitPrice || !newPeriod.validFrom || addPeriod.isPending}
-            onClick={() => addPeriod.mutate({ ...newPeriod, unitPrice: parseDecimalInput(newPeriod.unitPrice) })}
+            onClick={() => addPeriod.mutate(newPeriod)}
             className="btn-secondary text-sm"
           >
             <Plus size={13} />

@@ -35,6 +35,7 @@ export async function productRoutes(app: FastifyInstance) {
   app.post("/", { onRequest: [app.authenticate] }, async (req, reply) => {
     const input = CreateProductSchema.parse(req.body);
     const [row] = await db.insert(products).values(input).returning();
+    if (!row) throw new Error("Produkt konnte nicht erstellt werden");
     // Initialen Preiseintrag in die Historie schreiben
     await db.insert(productPriceHistory).values({
       productId: row.id,
@@ -101,7 +102,7 @@ export async function productRoutes(app: FastifyInstance) {
       .where(and(eq(productPriceHistory.productId, Number(id)), isNull(productPriceHistory.validTo)))
       .limit(1);
 
-    if (active.length > 0 && body.validFrom <= active[0].validFrom) {
+    if (active.length > 0 && body.validFrom <= active[0]!.validFrom) {
       return reply.status(400).send({ message: "Gültig ab muss nach der aktuellen Periode liegen" });
     }
 
@@ -111,7 +112,7 @@ export async function productRoutes(app: FastifyInstance) {
       prevTo.setDate(prevTo.getDate() - 1);
       await db.update(productPriceHistory)
         .set({ validTo: prevTo.toISOString().slice(0, 10) })
-        .where(eq(productPriceHistory.id, active[0].id));
+        .where(eq(productPriceHistory.id, active[0]!.id));
     }
 
     // Neue Periode anlegen

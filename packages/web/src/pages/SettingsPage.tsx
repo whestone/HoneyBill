@@ -13,6 +13,7 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import { Building2, CheckCircle, Percent, Plus, Trash2, FileText, Mail, Send, Eye, EyeOff, Users, ShieldCheck, UserCog, BadgeCheck, Hash, History } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
+import { DecimalInput } from "@/components/ui/DecimalInput";
 import { usePDF } from "@react-pdf/renderer";
 import { InvoicePDF } from "@/components/pdf/InvoiceTemplate";
 import type { Document as HBDocument, User, UserRole } from "@honeybill/shared";
@@ -1058,7 +1059,12 @@ function CreateTaxRateModal({ open, onClose, existing }: {
             <>
               <div>
                 <label className="label">Steuersatz (%) *</label>
-                <input {...field("ratePercent")} required type="number" step="0.01" min="0" max="100" className="input font-mono" />
+                <DecimalInput
+                  value={String(form.ratePercent)}
+                  onChange={(v) => setForm((f) => ({ ...f, ratePercent: v }))}
+                  required
+                  className="input font-mono"
+                />
               </div>
               <div>
                 <label className="label">Kategorie (EN 16931) *</label>
@@ -1092,7 +1098,6 @@ function CreateTaxRateModal({ open, onClose, existing }: {
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="btn-secondary">Abbrechen</button>
           <button type="submit" disabled={save.isPending} className="btn-primary">
-            <Percent size={14} />
             {save.isPending ? "Speichern…" : "Speichern"}
           </button>
         </div>
@@ -1159,15 +1164,11 @@ function CreateTaxRateModal({ open, onClose, existing }: {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label">Neuer Satz (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
+                <DecimalInput
                   value={newPeriod.ratePercent}
-                  onChange={(e) => setNewPeriod((p) => ({ ...p, ratePercent: e.target.value }))}
+                  onChange={(v) => setNewPeriod((p) => ({ ...p, ratePercent: v }))}
                   className="input font-mono"
-                  placeholder="7.70"
+                  placeholder="7,70"
                 />
               </div>
               <div>
