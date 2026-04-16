@@ -21,6 +21,7 @@ Einfache, selbst gehostete Rechnungssoftware für Deutschland – mit ZUGFeRD- u
 6. [Belegworkflow](#belegworkflow)
 7. [E-Rechnung (ZUGFeRD / XRechnung)](#e-rechnung-zugferd--xrechnung)
 8. [Technologie-Stack](#technologie-stack)
+9. [Verfügbare Skripte](#verfügbare-skripte)
 
 ---
 
@@ -75,10 +76,10 @@ pnpm dev
 
 | Feld | Wert |
 |------|------|
-| E-Mail / Benutzername | `admin` |
+| Benutzername | `admin` |
 | Passwort | `admin` |
 
-> **Hinweis:** Passwort nach dem ersten Login in den Einstellungen ändern.
+> **Hinweis:** Passwort nach dem ersten Login unter **Einstellungen → Benutzer** ändern.
 
 ---
 
@@ -115,6 +116,8 @@ pnpm migrate
 3. Unter **Einstellungen → Firmendaten** die eigenen Stammdaten eintragen
 4. Logo hochladen (PNG, JPG oder SVG, max. 2 MB)
 5. IBAN und BIC hinterlegen – diese erscheinen automatisch auf Rechnungen
+6. Steuersätze prüfen und ggf. anpassen
+7. E-Mail-Versand konfigurieren (optional)
 
 ---
 
@@ -159,16 +162,26 @@ Das Zahlungsziel wird in folgender Reihenfolge aufgelöst:
 
 ### Produkte
 
-Produkte/Leistungen können als Stammdaten hinterlegt und beim Erstellen von Belegen per Autocomplete eingefügt werden.
+Produkte und Leistungen können als Stammdaten hinterlegt und beim Erstellen von Belegen per Autocomplete eingefügt werden.
 
 | Feld | Beschreibung |
 |------|-------------|
 | Artikelnummer (SKU) | Eindeutige Kennung |
 | Bezeichnung | Name des Produkts / der Leistung |
 | Einheit | z. B. Stk, Std, km, Pauschal |
-| Einzelpreis | Netto-Verkaufspreis |
+| Einzelpreis | Netto-Verkaufspreis (aktuell gültiger Preis) |
 | Steuersatz | Verknüpfung mit einem definierten Steuersatz |
 | Kategorie | Optionale Gruppierung |
+
+#### Preishistorie
+
+Jedes Produkt führt eine lückenlose Preishistorie. Preisanpassungen werden als neue Periode angelegt, ohne die bisherigen Werte zu überschreiben:
+
+1. Produkt öffnen → **Neuer Preis ab...**
+2. Neuen Preis und Gültigkeitsdatum eintragen
+3. Der bisherige Preis wird automatisch abgeschlossen
+
+Belege übernehmen immer den Preis, der **zum Zeitpunkt der Finalisierung** gültig war.
 
 ---
 
@@ -183,7 +196,7 @@ Unter **Belege** werden alle Dokumente (Angebote, Rechnungen, Lieferscheine, Gut
 | Angebot | ANG | Unverbindliches Angebot an den Kunden |
 | Rechnung | RE | Zahlungspflichtige Rechnung |
 | Lieferschein | LS | Lieferdokumentation ohne Zahlungsaufforderung |
-| Gutschrift | GS | Storniert oder reduziert eine bestehende Rechnung |
+| Gutschrift | GS | Neutralisiert eine bestehende Rechnung (negative Beträge) |
 
 #### Belegstatus
 
@@ -194,19 +207,34 @@ Unter **Belege** werden alle Dokumente (Angebote, Rechnungen, Lieferscheine, Gut
 | Versendet | Als versendet markiert |
 | Teilbezahlt | Mindestens eine Zahlung, aber noch offener Betrag |
 | Bezahlt | Vollständig beglichen |
-| Storniert | Beleg wurde storniert |
+| Storniert | Beleg wurde storniert, Gegendokument vorhanden |
 
 #### Beleg erstellen
 
 1. **Belege → Neu** oder über den Button in der Listenansicht
 2. Kunden auswählen
 3. Positionen hinzufügen:
-   - Produkt aus dem Katalog wählen (Autocomplete beim Tippen oder Klick auf Lupe für vollständige Produktliste)
+   - Produkt aus dem Katalog wählen (Autocomplete beim Tippen oder Klick auf Lupe)
    - Oder freie Texteingabe
    - Menge, Einheit, Einzelpreis, Rabatt und Steuersatz anpassen
 4. Zahlungsziel und Lieferdatum optional eintragen
 5. **Speichern** — Beleg bleibt als Entwurf
 6. **Finalisieren** — Belegnummer wird vergeben, Beleg ist danach nicht mehr editierbar
+
+#### Rabatte
+
+Rabatte können auf zwei Ebenen angegeben werden:
+
+**Pro Position:**
+
+| Rabatttyp | Eingabe | Beispiel |
+|-----------|---------|---------|
+| Prozentual | `%` | `10` → 10 % Abzug vom Positionsbetrag |
+| Absolut | `€` | `5,00` → 5,00 € Abzug |
+
+**Globaler Rabatt (gilt für den gesamten Beleg):**
+
+Unter dem Positionsteil des Beleg-Editors kann ein globaler Rabatt als Prozentsatz oder Festbetrag eingetragen werden. Er wird proportional auf alle Steuerbereiche verteilt und auf dem PDF ausgewiesen.
 
 #### Zahlungen erfassen
 
@@ -216,16 +244,28 @@ Auf finalisierten Rechnungen können Zahlungseingänge erfasst werden:
 2. Datum, Betrag, Zahlungsart und Referenz eintragen
 3. Nach vollständiger Bezahlung wechselt der Status automatisch auf **Bezahlt**
 
+Gutschriften reduzieren ebenfalls den offenen Betrag einer verknüpften Rechnung.
+
 #### Verknüpfte Belege
 
-Jeder Beleg zeigt im Abschnitt **Verknüpfte Belege** alle zusammenhängenden Dokumente der gleichen Kette:
-- Aus einem Angebot erstellte Rechnung
-- Aus einer Rechnung erstellter Lieferschein
+Jeder Beleg zeigt im Abschnitt **Verknüpfte Belege** die gesamte Dokumentenkette — unabhängig davon wie tief die Kette ist (z. B. mehrfach stornierte Belege). Angezeigt werden:
+
+- Aus einem Angebot erstellte Rechnungen und Lieferscheine
 - Einer Rechnung zugeordnete Gutschriften
+- Stornobelege und deren Gegendokumente
 
 #### PDF herunterladen
 
-Über den **PDF**-Button auf der Belegdetailseite wird ein PDF generiert. Das Layout kann unter **Einstellungen → PDF-Layout** angepasst werden.
+Über den **PDF**-Button auf der Belegdetailseite wird ein PDF generiert. Das Layout kann unter **Einstellungen → PDF-Layout** global oder pro Belegtyp angepasst werden.
+
+#### E-Mail versenden
+
+Über den **E-Mail**-Button kann der Beleg direkt aus der Anwendung versendet werden:
+
+- **SMTP:** E-Mail wird serverseitig über den konfigurierten SMTP-Server gesendet
+- **Outlook:** Öffnet einen vorausgefüllten `mailto:`-Link im Standard-E-Mail-Client
+
+Betreff und Nachrichtentext können mit Platzhaltern individuell vorbelegt werden (siehe [E-Mail-Einstellungen](#e-mail)).
 
 ---
 
@@ -235,7 +275,7 @@ Die **Offene-Posten-Liste** zeigt alle Rechnungen mit noch ausstehendem Betrag.
 
 - **Offener Betrag** = Rechnungsbetrag − Zahlungen − Gutschriften
 - Rechnungen mit offenem Betrag = 0 werden automatisch ausgeblendet
-- Filter: **Nur überfällige** zeigt Rechnungen nach Fälligkeitsdatum
+- Filter **Nur überfällige** zeigt Rechnungen nach Fälligkeitsdatum
 
 ---
 
@@ -253,7 +293,7 @@ Alle Stammdaten die auf Belegen und in der Fußzeile erscheinen:
 
 #### Steuersätze
 
-Steuersätze mit Gültigkeitszeiträumen für historisch korrekte Rückrechnung:
+Steuersätze werden mit Gültigkeitszeiträumen verwaltet, damit historisch erstellte Belege immer den damals gültigen Satz verwenden.
 
 | Kategorie | Bedeutung |
 |-----------|----------|
@@ -262,6 +302,23 @@ Steuersätze mit Gültigkeitszeiträumen für historisch korrekte Rückrechnung:
 | Z | Nullsatz |
 | E | Steuerbefreit |
 | O | Außerhalb des Steuerbereichs |
+
+Neue Steuerperioden werden über **Nachfolger anlegen** erstellt. Der bisherige Satz wird automatisch zum Vortag abgeschlossen. Ein Steuersatz kann nur gelöscht werden, wenn er weder in Produkten noch in Belegpositionen verwendet wird.
+
+#### Nummernkreise
+
+Für jeden Belegtyp kann das Nummernformat individuell definiert werden:
+
+| Variable | Bedeutung |
+|----------|-----------|
+| `{YYYY}` | Vierstelliges Jahr |
+| `{YY}` | Zweistelliges Jahr |
+| `{MM}` | Monat (zweistellig) |
+| `{SEQ}` | Laufende Nummer (Länge durch Anzahl der `N` bestimmt, z. B. `{NNNNN}`) |
+
+Beispiel: `RE-{YYYY}-{NNNNN}` → `RE-2026-00001`
+
+Eine **Vorschau** zeigt die nächste Nummer auf Basis der aktuellen Einstellungen.
 
 #### PDF-Layout
 
@@ -276,8 +333,51 @@ Im Tab **PDF-Layout** kann das Erscheinungsbild aller generierten PDFs angepasst
 | Schriftgröße Titel | Schriftgröße des Dokumententitels (Standard: 18) |
 | Rand seitlich / oben / unten | Seitenabstände in px |
 | Logo-Breite / -Höhe | Abmessungen des Logos im PDF |
+| Spalten | Sichtbarkeit der Tabellenspalten (Menge, Einheit, Preis, Rabatt, Steuer …) |
+| Betragsanzeige | Netto, Brutto oder beides |
+| Schlusstext | Individueller Text unter der Summentabelle |
 
 Auf der rechten Seite wird eine **Live-Vorschau** mit einer Musterrechnung angezeigt, die sich sofort bei jeder Änderung aktualisiert.
+
+Pro Belegtyp können abweichende Layouts hinterlegt werden.
+
+#### E-Mail
+
+Unter **Einstellungen → E-Mail** wird der Versandkanal konfiguriert:
+
+**SMTP:**
+
+| Feld | Beschreibung |
+|------|-------------|
+| Host | SMTP-Serveradresse |
+| Port | Typischerweise 587 (STARTTLS) oder 465 (SSL) |
+| Sicher (SSL) | Direktes SSL statt STARTTLS |
+| Benutzername / Passwort | SMTP-Zugangsdaten |
+| Absendername / -adresse | Erscheint als „Von" beim Empfänger |
+
+Über **Verbindung testen** wird eine Test-E-Mail an eine beliebige Adresse gesendet.
+
+**Outlook-Modus:** Öffnet beim Versenden einen `mailto:`-Link im lokalen E-Mail-Client. PDF wird vorab zum Download angeboten.
+
+**E-Mail-Vorlagen:** Betreff und Nachrichtentext können mit Platzhaltern vorbelegt werden:
+
+| Platzhalter | Inhalt |
+|-------------|--------|
+| `{{documentNumber}}` | Belegnummer |
+| `{{documentType}}` | Belegtyp (z. B. Rechnung) |
+| `{{customerName}}` | Kundenname |
+| `{{totalGross}}` | Bruttobetrag |
+| `{{dueDate}}` | Fälligkeitsdatum |
+| `{{salutation}}` | Anrede (Sehr geehrte/r …) |
+
+#### Benutzerverwaltung
+
+Unter **Einstellungen → Benutzer** können weitere Benutzer angelegt und verwaltet werden:
+
+| Rolle | Berechtigungen |
+|-------|---------------|
+| Admin | Vollzugriff inkl. Benutzerverwaltung und Einstellungen |
+| User | Belege, Kunden, Produkte — keine Benutzerverwaltung |
 
 ---
 
@@ -286,11 +386,22 @@ Auf der rechten Seite wird eine **Live-Vorschau** mit einer Musterrechnung angez
 ```
 Angebot (ANG)
     │
-    ▼ "In Rechnung umwandeln"
-Rechnung (RE) ──────────────────────► Gutschrift (GS)
-    │                                  (reduziert offenen Betrag)
-    ▼ "Lieferschein erstellen"
-Lieferschein (LS)
+    ├──► "In Rechnung umwandeln"
+    │         │
+    │         ▼
+    │    Rechnung (RE) ──► "Gutschrift erstellen" ──► Gutschrift (GS)
+    │         │                                            │
+    │         │                                     "Stornieren"
+    │         │                                            │
+    │         │                                            ▼
+    │         │                                       Rechnung (RE) [Storno-GS]
+    │         │
+    │         ├──► "Stornieren" ──► Gutschrift (GS) [Stornobeleg]
+    │         │
+    │         └──► "Lieferschein erstellen"
+    │                    │
+    ▼                    ▼
+    └──────────────► Lieferschein (LS)
 ```
 
 ### Workflow-Schaltflächen
@@ -300,8 +411,15 @@ Lieferschein (LS)
 | In Rechnung umwandeln | Angebot (finalisiert) | Neue Rechnung mit gleichen Positionen |
 | Lieferschein erstellen | Angebot oder Rechnung (finalisiert) | Neuer Lieferschein-Entwurf |
 | Gutschrift erstellen | Rechnung (finalisiert) | Neue Gutschrift, verknüpft mit Original |
-| Stornieren | Finalisierter Beleg | Status → Storniert |
-| Löschen | Nur Entwürfe | Beleg wird gelöscht |
+| Stornieren | Finalisierter Beleg | Erstellt automatisch einen Storno-Gegenbelegs und setzt Status auf Storniert |
+| Löschen | Nur Entwürfe | Beleg wird unwiderruflich gelöscht |
+
+### Storno-Logik
+
+| Stornierter Beleg | Erzeugter Stornobeleg | Wirkung |
+|-------------------|-----------------------|---------|
+| Rechnung (RE) | Gutschrift (GS) mit negierten Preisen | Hebt Rechnung buchhaltungstechnisch auf |
+| Gutschrift (GS) | Rechnung (RE) mit negierten Preisen | Hebt Gutschrift buchhaltungstechnisch auf |
 
 ---
 
@@ -317,7 +435,9 @@ Reines XML-Format für öffentliche Auftraggeber. Download über den **XRechnung
 
 ### ZUGFeRD
 
-PDF mit eingebettetem XML (EN 16931). Das generierte PDF enthält maschinenlesbare Rechnungsdaten, die von Buchhaltungssoftware automatisch verarbeitet werden können.
+PDF mit eingebettetem XML (EN 16931 / EXTENDED). Das generierte PDF enthält maschinenlesbare Rechnungsdaten, die von Buchhaltungssoftware automatisch verarbeitet werden können.
+
+Profil am Beleg wählen: **ZUGFeRD Extended** oder **XRechnung**.
 
 ---
 
@@ -331,6 +451,7 @@ PDF mit eingebettetem XML (EN 16931). Das generierte PDF enthält maschinenlesba
 | Styling | Tailwind CSS |
 | PDF-Generierung | @react-pdf/renderer |
 | E-Rechnung | pdf-lib, Mustache |
+| E-Mail-Versand | Nodemailer (SMTP), mailto (Outlook) |
 | Authentifizierung | JWT (Fastify JWT), argon2 |
 | Validierung | Zod |
 | Monorepo | pnpm Workspaces |
