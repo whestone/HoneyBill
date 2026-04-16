@@ -193,7 +193,7 @@ export function InvoicePDF({ doc, company }: InvoicePDFProps) {
                 unit: li.unit,
                 price: formatEur(li.unitPrice),
                 discount: li.discountPct !== "0.00"
-                  ? ((li as any).discountType === "abs" ? formatEur(li.discountPct) : `${li.discountPct}%`)
+                  ? ((li as any).discountType === "abs" ? formatEur(li.discountPct) : `${parseFloat(li.discountPct).toLocaleString("de-DE")}%`)
                   : "—",
                 tax: `${parseFloat(li.taxRatePct).toLocaleString("de-DE")}%`,
                 taxAmt: formatEur(li.lineTax),
@@ -330,7 +330,7 @@ function TotalsBlock({ doc, layout, s }: { doc: HBDocument; layout: DocumentLayo
           <Text style={[base.totalsLabel, { color: "#dc2626" }]}>
             {globalDiscountType === "abs"
               ? `Rabatt ${formatEur(String(globalDiscountPct))}`
-              : `Rabatt ${globalDiscountPct}%`}
+              : `Rabatt ${globalDiscountPct.toLocaleString("de-DE")}%`}
           </Text>
           <Text style={[base.totalsValue, { color: "#dc2626" }]}>
             -{globalDiscountType === "abs"
