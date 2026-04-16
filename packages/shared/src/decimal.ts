@@ -50,12 +50,14 @@ export function sumStrings(values: string[]): string {
 
 /** Format a decimal string as EUR currency string (e.g. "1.234,56 €"). */
 export function formatEur(value: string, locale = "de-DE"): string {
-  return new Intl.NumberFormat(locale, {
+  const formatted = new Intl.NumberFormat(locale, {
     style: "currency",
     currency: "EUR",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number(value));
+  // Remove any whitespace (including narrow no-break space U+202F) between number and €
+  return formatted.replace(/\s*€/, "€").replace(/€\s*/, "€");
 }
 
 /** Parse a localized number string back to a plain decimal string. */
