@@ -206,9 +206,9 @@ export async function documentRoutes(app: FastifyInstance) {
           description: li.description,
           quantity: li.quantity,
           unit: li.unit,
-          // Negate the unit price to reverse the original
+          // Flip the sign of the unit price so the storno reverses the source document
           unitPrice: li.lineType === "ITEM"
-            ? (li.unitPrice.startsWith("-") ? li.unitPrice : `-${li.unitPrice}`)
+            ? new Decimal(li.unitPrice).negated().toFixed(2)
             : li.unitPrice,
           discountPct: li.discountPct,
           discountType: (li.discountType ?? "pct") as "pct" | "abs",
@@ -295,7 +295,7 @@ export async function documentRoutes(app: FastifyInstance) {
           unit: li.unit,
           // Negate unit price so the Gutschrift reverses the original amounts
           unitPrice: li.lineType === "ITEM"
-            ? (li.unitPrice.startsWith("-") ? li.unitPrice : `-${li.unitPrice}`)
+            ? new Decimal(li.unitPrice).negated().toFixed(2)
             : li.unitPrice,
           discountPct: li.discountPct,
           discountType: (li.discountType ?? "pct") as "pct" | "abs",
