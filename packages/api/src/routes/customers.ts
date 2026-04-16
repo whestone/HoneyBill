@@ -66,7 +66,7 @@ export async function customerRoutes(app: FastifyInstance) {
       (input as { customerNumber?: string }).customerNumber = `KD-${String(lastNum + 1).padStart(5, "0")}`;
     }
 
-    const [row] = await db.insert(customers).values(input).returning();
+    const [row] = await db.insert(customers).values(input as typeof input & { customerNumber: string }).returning();
     return reply.status(201).send(row);
   });
 

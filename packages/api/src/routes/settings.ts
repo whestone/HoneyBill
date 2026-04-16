@@ -1,10 +1,10 @@
 import type { FastifyInstance } from "fastify";
-import { eq, and, isNull, lte } from "drizzle-orm";
+import { eq, and, isNull, lte, sql } from "drizzle-orm";
 import path from "node:path";
 import fs from "node:fs";
 import nodemailer from "nodemailer";
 import { db } from "../db/index.js";
-import { companySettings, documents, numberSeries, taxRates } from "../db/schema.js";
+import { companySettings, documents, documentLineItems, numberSeries, products, taxRates } from "../db/schema.js";
 import {
   UpdateCompanySettingsSchema, UpdateNumberSeriesSchema,
   UpdatePdfSettingsSchema, UpdateEmailSettingsSchema, SendDocumentEmailSchema,
@@ -277,7 +277,29 @@ export async function taxRateRoutes(app: FastifyInstance) {
   // DELETE /api/v1/tax-rates/:id
   app.delete("/:id", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    await db.delete(taxRates).where(eq(taxRates.id, Number(id)));
+    const taxRateId = Number(id);
+
+    // Prüfen, ob der Steuersatz noch referenziert wird
+    const [usedInProducts] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(products)
+      .where(eq(products.taxRateId, taxRateId));
+    if ((usedInProducts?.count ?? 0) > 0) {
+      return reply.status(400).send({
+        message: `Steuersatz wird noch von ${usedInProducts!.count} Produkt(en) verwendet und kann nicht gelöscht werden. Bitte zuerst die Produkte auf einen anderen Steuersatz umstellen.`,
+      });
+    }
+    const [usedInLineItems] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(documentLineItems)
+      .where(eq(documentLineItems.taxRateId, taxRateId));
+    if ((usedInLineItems?.count ?? 0) > 0) {
+      return reply.status(400).send({
+        message: `Steuersatz wird noch in ${usedInLineItems!.count} Rechnungsposition(en) verwendet und kann nicht gelöscht werden.`,
+      });
+    }
+
+    await db.delete(taxRates).where(eq(taxRates.id, taxRateId));
     return reply.status(204).send();
   });
 }

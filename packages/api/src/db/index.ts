@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import Database, { type Database as SQLiteDatabase } from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
@@ -11,7 +11,7 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-const sqlite = new Database(config.dbPath);
+const sqlite: SQLiteDatabase = new Database(config.dbPath);
 
 // Performance and safety pragmas
 sqlite.pragma("journal_mode = WAL");
