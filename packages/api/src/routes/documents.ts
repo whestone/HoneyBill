@@ -161,7 +161,8 @@ export async function documentRoutes(app: FastifyInstance) {
   });
 
   // POST /api/v1/documents/:id/cancel
-  // Creates an auto-finalized Stornorechnung (CREDIT_NOTE with negative amounts), then cancels the original.
+  // Cancels a finalized document by creating an auto-finalized counter-document with negated amounts:
+  // INVOICE → CREDIT_NOTE (negative), CREDIT_NOTE → INVOICE (double-negation = positive)
   app.post("/:id/cancel", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const userId = Number((req.user as { sub: string }).sub);
@@ -175,11 +176,12 @@ export async function documentRoutes(app: FastifyInstance) {
       return reply.status(409).send({ message: "Nur finalisierte Belege können storniert werden" });
     }
 
-    // Create Stornorechnung as CREDIT_NOTE with negated prices
+    // Create Stornobeleg: CREDIT_NOTE cancels an INVOICE; INVOICE cancels a CREDIT_NOTE
+    const stornoType = source.documentType === "CREDIT_NOTE" ? "INVOICE" : "CREDIT_NOTE";
     const storno = await createDocument(
       db,
       {
-        documentType: "CREDIT_NOTE",
+        documentType: stornoType,
         customerId: source.customerId,
         cancelsDocumentId: source.id,
         currency: source.currency,
