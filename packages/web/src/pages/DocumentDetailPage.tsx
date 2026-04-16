@@ -12,14 +12,14 @@ import {
   useCreateDeliveryNote,
   useRelatedDocuments,
 } from "@/api/hooks/useDocuments";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { StatusBadge, TypeBadge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { PdfPreview } from "@/components/pdf/PdfPreview";
 import { formatEur, DOCUMENT_TYPE_LABELS, DEFAULT_EMAIL_SETTINGS } from "@honeybill/shared";
 import type { CompanySettings, Document, DocumentType, User } from "@honeybill/shared";
-import { ArrowLeft, CheckCircle, CreditCard, Edit2, FileText, Send, Truck, Trash2, XCircle, Mail } from "lucide-react";
+import { ArrowLeft, CheckCircle, Check, CreditCard, Edit2, FileText, Send, Truck, Trash2, X, XCircle, Mail } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { pdf } from "@react-pdf/renderer";
 import { InvoicePDF } from "@/components/pdf/InvoiceTemplate";
@@ -34,6 +34,8 @@ export function DocumentDetailPage() {
   const [showPayment, setShowPayment] = useState(false);
   const [showPdf, setShowPdf] = useState(false);
   const [showEmail, setShowEmail] = useState(false);
+  const [notesEditing, setNotesEditing] = useState(false);
+  const [notesValue, setNotesValue] = useState("");
 
   const { data: doc, isLoading } = useDocument(Number(id));
   const { data: relatedDocs = [] } = useRelatedDocuments(Number(id));
@@ -44,6 +46,12 @@ export function DocumentDetailPage() {
   const { data: me } = useQuery<User>({
     queryKey: ["me"],
     queryFn: () => api.get("/auth/me"),
+  });
+
+  const qc = useQueryClient();
+  const saveNotes = useMutation({
+    mutationFn: (notes: string) => api.patch(`/documents/${id}/notes`, { internalNotes: notes || null }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["document", Number(id)] }); setNotesEditing(false); },
   });
 
   const confirm = useConfirm();
@@ -248,6 +256,50 @@ export function DocumentDetailPage() {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Internal notes */}
+          <div className="card px-4 py-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Interne Notiz</span>
+              {!notesEditing && (
+                <button
+                  onClick={() => { setNotesValue(doc.internalNotes ?? ""); setNotesEditing(true); }}
+                  className="text-gray-400 hover:text-honey-600 transition-colors"
+                  title="Bearbeiten"
+                >
+                  <Edit2 size={13} />
+                </button>
+              )}
+            </div>
+            {notesEditing ? (
+              <div className="space-y-2">
+                <textarea
+                  autoFocus
+                  className="input text-sm resize-y w-full"
+                  rows={2}
+                  value={notesValue}
+                  onChange={(e) => setNotesValue(e.target.value)}
+                  placeholder="Interne Notizen…"
+                />
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => setNotesEditing(false)} className="btn-secondary text-xs py-1 flex items-center gap-1">
+                    <X size={12} /> Abbrechen
+                  </button>
+                  <button
+                    onClick={() => saveNotes.mutate(notesValue)}
+                    disabled={saveNotes.isPending}
+                    className="btn-primary text-xs py-1 flex items-center gap-1"
+                  >
+                    <Check size={12} /> Speichern
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-600 whitespace-pre-wrap min-h-[1.25rem]">
+                {doc.internalNotes || <span className="text-gray-300 italic">Keine Notiz</span>}
+              </p>
+            )}
           </div>
 
           {/* Line items */}
