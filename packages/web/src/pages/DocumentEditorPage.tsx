@@ -114,6 +114,7 @@ export function DocumentEditorPage() {
   const [deliveryDate, setDeliveryDate] = useState("");
   const [paymentDays, setPaymentDays] = useState<string>("");
   const [internalNotes, setInternalNotes] = useState("");
+  const [closingText, setClosingText] = useState("");
   const [einvoiceProfile, setEinvoiceProfile] = useState<string>("");
   const [globalDiscountPct, setGlobalDiscountPct] = useState("0.00");
   const [globalDiscountType, setGlobalDiscountType] = useState<"pct" | "abs">("pct");
@@ -136,7 +137,8 @@ export function DocumentEditorPage() {
       if (typeof raw === "string") { try { return JSON.parse(raw); } catch { return null; } }
       return raw;
     })();
-    setLayoutOverride(lo);
+    setClosingText(lo?.closingText ?? "");
+    setLayoutOverride(lo ? { ...lo, closingText: undefined } : null);
   }, [doc?.id]); // only on doc id change, not every render
 
   // Totals
@@ -239,7 +241,7 @@ export function DocumentEditorPage() {
         einvoiceProfile: einvoiceProfile || null,
         globalDiscountPct: globalDiscountPct || "0.00",
         globalDiscountType,
-        layoutOverride: layoutOverride || null,
+        layoutOverride: (layoutOverride || closingText) ? { ...layoutOverride, ...(closingText ? { closingText } : {}) } : null,
         lineItems: rows.map((r, i) => ({
           position: i,
           lineType: r.lineType,
@@ -258,7 +260,7 @@ export function DocumentEditorPage() {
     } finally {
       setSaving(false);
     }
-  }, [doc, rows, deliveryDate, paymentDays, internalNotes, einvoiceProfile, globalDiscountPct, globalDiscountType, layoutOverride, qc]);
+  }, [doc, rows, deliveryDate, paymentDays, internalNotes, closingText, einvoiceProfile, globalDiscountPct, globalDiscountType, layoutOverride, qc]);
 
   const handleFinalize = async () => {
     setFinalizeError(null);
@@ -399,6 +401,16 @@ export function DocumentEditorPage() {
                   value={internalNotes}
                   onChange={(e) => { setInternalNotes(e.target.value); setDirty(true); }}
                   placeholder="Interne Notizen…"
+                />
+              </div>
+              <div className="col-span-2 md:col-span-3">
+                <label className="label">Schlusstext (erscheint auf dem PDF)</label>
+                <textarea
+                  className="input text-sm resize-y"
+                  rows={2}
+                  value={closingText}
+                  onChange={(e) => { setClosingText(e.target.value); setDirty(true); }}
+                  placeholder="z. B. Vielen Dank für Ihren Auftrag."
                 />
               </div>
             </div>
@@ -775,10 +787,6 @@ function LayoutOverrideModal({
     setLocal((prev) => ({ ...prev, totalDisplay: mode }));
   };
 
-  const setClosingText = (text: string) => {
-    setLocal((prev) => ({ ...prev, closingText: text }));
-  };
-
   const handleReset = () => {
     setLocal({});
   };
@@ -868,16 +876,6 @@ function LayoutOverrideModal({
               </label>
             ))}
           </div>
-        </div>
-
-        <div>
-          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Schlusstext</h4>
-          <textarea
-            className="input text-sm"
-            rows={2}
-            value={merged.closingText}
-            onChange={(e) => setClosingText(e.target.value)}
-          />
         </div>
 
         <div className="flex justify-between pt-2 border-t border-gray-100">
