@@ -196,6 +196,7 @@ export async function documentRoutes(app: FastifyInstance) {
             ? (li.unitPrice.startsWith("-") ? li.unitPrice : `-${li.unitPrice}`)
             : li.unitPrice,
           discountPct: li.discountPct,
+          discountType: (li.discountType ?? "pct") as "pct" | "abs",
           taxRateId: li.taxRateId ?? undefined,
         })),
       },
@@ -241,6 +242,7 @@ export async function documentRoutes(app: FastifyInstance) {
           unit: li.unit,
           unitPrice: li.unitPrice,
           discountPct: li.discountPct,
+          discountType: (li.discountType ?? "pct") as "pct" | "abs",
           taxRateId: li.taxRateId ?? undefined,
         })),
       },
@@ -281,6 +283,7 @@ export async function documentRoutes(app: FastifyInstance) {
             ? (li.unitPrice.startsWith("-") ? li.unitPrice : `-${li.unitPrice}`)
             : li.unitPrice,
           discountPct: li.discountPct,
+          discountType: (li.discountType ?? "pct") as "pct" | "abs",
           taxRateId: li.taxRateId ?? undefined,
         })),
       },
@@ -319,6 +322,7 @@ export async function documentRoutes(app: FastifyInstance) {
           unit: li.unit,
           unitPrice: li.unitPrice,
           discountPct: li.discountPct,
+          discountType: (li.discountType ?? "pct") as "pct" | "abs",
           taxRateId: li.taxRateId ?? undefined,
         })),
       },

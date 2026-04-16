@@ -1,5 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
-import Decimal from "decimal.js";
+import { Decimal } from "@honeybill/shared";
 import type { DB } from "../db/index.js";
 import { sqlite } from "../db/index.js";
 import {
@@ -150,7 +150,8 @@ export async function finalizeDocument(db: DB, docId: number, userId: number | n
   });
 
   // Snapshot products and recompute totals
-  const updatedLineItems = [];
+  type LineItemWithTax = (typeof lineItems)[number] & { taxRatePct: string; lineNet: string; lineTax: string; lineGross: string };
+  const updatedLineItems: LineItemWithTax[] = [];
   for (const li of lineItems) {
     if (li.lineType !== "ITEM") continue;
     const taxRate = li.taxRate;
@@ -411,7 +412,7 @@ async function recalcTotals(db: DB, docId: number) {
 
   const subtotalNet = rawNet.mul(discountFactor).toDecimalPlaces(2, 4).toFixed(2);
   const totalTax = rawTax.mul(discountFactor).toDecimalPlaces(2, 4).toFixed(2);
-  const totalGross = new Decimal(subtotalNet).plus(new Decimal(totalTax)).toFixed(2);
+  const totalGross = new Decimal(subtotalNet).plus(totalTax).toFixed(2);
 
   await db
     .update(documents)

@@ -1098,7 +1098,6 @@ function CreateTaxRateModal({ open, onClose, existing }: {
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="btn-secondary">Abbrechen</button>
           <button type="submit" disabled={save.isPending} className="btn-primary">
-            <Percent size={14} />
             {save.isPending ? "Speichern…" : "Speichern"}
           </button>
         </div>
