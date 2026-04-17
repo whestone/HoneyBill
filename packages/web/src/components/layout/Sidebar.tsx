@@ -73,7 +73,10 @@ export function Sidebar() {
 
       {/* User */}
       <div className="px-4 py-4 border-t border-gray-100">
-        <div className="text-xs text-gray-500 truncate mb-2">{user?.email}</div>
+        <div className="mb-2">
+          <div className="text-sm font-medium text-gray-700 truncate">{user?.fullName}</div>
+          <div className="text-xs text-gray-400 truncate">{user?.email}</div>
+        </div>
         <button
           onClick={() => logout.mutate()}
           className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors"
