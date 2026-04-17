@@ -189,6 +189,12 @@ export async function documentRoutes(app: FastifyInstance) {
       return reply.status(409).send({ message: "Nur finalisierte Belege können storniert werden" });
     }
 
+    // Angebote und Lieferscheine werden direkt storniert — kein Gegendokument nötig
+    if (!["INVOICE", "CREDIT_NOTE"].includes(source.documentType)) {
+      await cancelDocument(db, Number(id), userId);
+      return reply.send({ ok: true, stornoId: null });
+    }
+
     // Create Stornobeleg: CREDIT_NOTE cancels an INVOICE; INVOICE cancels a CREDIT_NOTE
     const stornoType = source.documentType === "CREDIT_NOTE" ? "INVOICE" : "CREDIT_NOTE";
     const storno = await createDocument(
@@ -319,8 +325,8 @@ export async function documentRoutes(app: FastifyInstance) {
       with: { lineItems: true },
     });
     if (!source) return reply.status(404).send({ message: "Beleg nicht gefunden" });
-    if (!["QUOTE", "INVOICE"].includes(source.documentType)) {
-      return reply.status(409).send({ message: "Nur Angebote und Rechnungen können als Lieferschein erstellt werden" });
+    if (source.documentType !== "INVOICE") {
+      return reply.status(409).send({ message: "Nur Rechnungen können als Lieferschein erstellt werden" });
     }
 
     const delivery = await createDocument(

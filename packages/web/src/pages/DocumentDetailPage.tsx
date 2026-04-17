@@ -80,7 +80,7 @@ export function DocumentDetailPage() {
   const canDelete = doc.status === "DRAFT";
   const canPay = ["FINAL", "SENT", "PARTIAL"].includes(doc.status) && doc.documentType === "INVOICE";
   const canConvertToInvoice = ["FINAL", "SENT"].includes(doc.status) && doc.documentType === "QUOTE";
-  const canCreateDeliveryNote = ["FINAL", "SENT"].includes(doc.status) && ["QUOTE", "INVOICE"].includes(doc.documentType);
+  const canCreateDeliveryNote = ["FINAL", "SENT"].includes(doc.status) && doc.documentType === "INVOICE";
   const canCreditNote = ["FINAL", "SENT", "PARTIAL"].includes(doc.status) && doc.documentType === "INVOICE";
 
   const totalPaid = (doc.payments ?? []).reduce(
