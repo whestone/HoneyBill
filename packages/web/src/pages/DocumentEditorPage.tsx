@@ -114,6 +114,7 @@ export function DocumentEditorPage() {
   const [deliveryDate, setDeliveryDate] = useState("");
   const [paymentDays, setPaymentDays] = useState<string>("");
   const [internalNotes, setInternalNotes] = useState("");
+  const [closingText, setClosingText] = useState("");
   const [einvoiceProfile, setEinvoiceProfile] = useState<string>("");
   const [globalDiscountPct, setGlobalDiscountPct] = useState("0.00");
   const [globalDiscountType, setGlobalDiscountType] = useState<"pct" | "abs">("pct");
@@ -136,8 +137,21 @@ export function DocumentEditorPage() {
       if (typeof raw === "string") { try { return JSON.parse(raw); } catch { return null; } }
       return raw;
     })();
-    setLayoutOverride(lo);
+    setClosingText(lo?.closingText ?? DEFAULT_LAYOUTS[doc.documentType as DocumentType]?.closingText ?? "");
+    setLayoutOverride(lo ? { ...lo, closingText: undefined } : null);
   }, [doc?.id]); // only on doc id change, not every render
+
+  // Once company settings load, refine default closing text (company may override DEFAULT_LAYOUTS)
+  useEffect(() => {
+    if (!company || !doc) return;
+    setClosingText((prev) => {
+      // Only update if the current value matches a DEFAULT_LAYOUTS default (not user-edited or explicitly set override)
+      const lo = (() => { const raw = (doc as any).layoutOverride; if (!raw) return null; if (typeof raw === "string") { try { return JSON.parse(raw); } catch { return null; } } return raw; })();
+      if (lo?.closingText) return prev; // explicit override — keep
+      const companyDefault = (company?.pdfSettings?.layouts?.[doc.documentType] as any)?.closingText;
+      return companyDefault ?? prev;
+    });
+  }, [company?.pdfSettings, doc?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Totals
   const rawSubtotalNet = rows
@@ -239,7 +253,7 @@ export function DocumentEditorPage() {
         einvoiceProfile: einvoiceProfile || null,
         globalDiscountPct: globalDiscountPct || "0.00",
         globalDiscountType,
-        layoutOverride: layoutOverride || null,
+        layoutOverride: (layoutOverride || closingText) ? { ...layoutOverride, ...(closingText ? { closingText } : {}) } : null,
         lineItems: rows.map((r, i) => ({
           position: i,
           lineType: r.lineType,
@@ -258,7 +272,7 @@ export function DocumentEditorPage() {
     } finally {
       setSaving(false);
     }
-  }, [doc, rows, deliveryDate, paymentDays, internalNotes, einvoiceProfile, globalDiscountPct, globalDiscountType, layoutOverride, qc]);
+  }, [doc, rows, deliveryDate, paymentDays, internalNotes, closingText, einvoiceProfile, globalDiscountPct, globalDiscountType, layoutOverride, qc]);
 
   const handleFinalize = async () => {
     setFinalizeError(null);
@@ -399,6 +413,16 @@ export function DocumentEditorPage() {
                   value={internalNotes}
                   onChange={(e) => { setInternalNotes(e.target.value); setDirty(true); }}
                   placeholder="Interne Notizen…"
+                />
+              </div>
+              <div className="col-span-2 md:col-span-3">
+                <label className="label">Schlusstext (erscheint auf dem PDF)</label>
+                <textarea
+                  className="input text-sm resize-y"
+                  rows={2}
+                  value={closingText}
+                  onChange={(e) => { setClosingText(e.target.value); setDirty(true); }}
+                  placeholder="z. B. Vielen Dank für Ihren Auftrag."
                 />
               </div>
             </div>
@@ -775,10 +799,6 @@ function LayoutOverrideModal({
     setLocal((prev) => ({ ...prev, totalDisplay: mode }));
   };
 
-  const setClosingText = (text: string) => {
-    setLocal((prev) => ({ ...prev, closingText: text }));
-  };
-
   const handleReset = () => {
     setLocal({});
   };
@@ -870,16 +890,6 @@ function LayoutOverrideModal({
           </div>
         </div>
 
-        <div>
-          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Schlusstext</h4>
-          <textarea
-            className="input text-sm"
-            rows={2}
-            value={merged.closingText}
-            onChange={(e) => setClosingText(e.target.value)}
-          />
-        </div>
-
         <div className="flex justify-between pt-2 border-t border-gray-100">
           <button onClick={handleReset} className="btn-secondary text-xs">
             Auf global zurücksetzen
@@ -905,7 +915,8 @@ function ProductAutocomplete({
   anchorRef: React.RefObject<HTMLDivElement | null>;
   onSelect: (p: Product) => void;
 }) {
-  const [style, setStyle] = useState<React.CSSProperties>({});
+  // Start off-screen and fixed so the element never enters normal flow before position is calculated
+  const [style, setStyle] = useState<React.CSSProperties>({ position: "fixed", top: -9999, left: -9999 });
 
   useEffect(() => {
     if (anchorRef.current) {

@@ -160,6 +160,19 @@ export async function documentRoutes(app: FastifyInstance) {
     return reply.send({ ok: true });
   });
 
+  // PATCH /api/v1/documents/:id/notes — update internalNotes regardless of status
+  app.patch("/:id/notes", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { internalNotes } = req.body as { internalNotes: string | null };
+    const doc = await db.query.documents.findFirst({ where: eq(documents.id, Number(id)) });
+    if (!doc) return reply.status(404).send({ message: "Beleg nicht gefunden" });
+    await db
+      .update(documents)
+      .set({ internalNotes: internalNotes ?? null, updatedAt: new Date().toISOString() })
+      .where(eq(documents.id, Number(id)));
+    return reply.send({ ok: true });
+  });
+
   // POST /api/v1/documents/:id/cancel
   // Cancels a finalized document by creating an auto-finalized counter-document with negated amounts:
   // INVOICE → CREDIT_NOTE (negative), CREDIT_NOTE → INVOICE (double-negation = positive)
@@ -174,6 +187,12 @@ export async function documentRoutes(app: FastifyInstance) {
     if (!source) return reply.status(404).send({ message: "Beleg nicht gefunden" });
     if (!["FINAL", "SENT", "PARTIAL"].includes(source.status)) {
       return reply.status(409).send({ message: "Nur finalisierte Belege können storniert werden" });
+    }
+
+    // Angebote und Lieferscheine werden direkt storniert — kein Gegendokument nötig
+    if (!["INVOICE", "CREDIT_NOTE"].includes(source.documentType)) {
+      await cancelDocument(db, Number(id), userId);
+      return reply.send({ ok: true, stornoId: null });
     }
 
     // Create Stornobeleg: CREDIT_NOTE cancels an INVOICE; INVOICE cancels a CREDIT_NOTE
@@ -193,9 +212,9 @@ export async function documentRoutes(app: FastifyInstance) {
           description: li.description,
           quantity: li.quantity,
           unit: li.unit,
-          // Negate the unit price to reverse the original
+          // Flip the sign of the unit price so the storno reverses the source document
           unitPrice: li.lineType === "ITEM"
-            ? (li.unitPrice.startsWith("-") ? li.unitPrice : `-${li.unitPrice}`)
+            ? new Decimal(li.unitPrice).negated().toFixed(2)
             : li.unitPrice,
           discountPct: li.discountPct,
           discountType: (li.discountType ?? "pct") as "pct" | "abs",
@@ -235,6 +254,9 @@ export async function documentRoutes(app: FastifyInstance) {
         paymentDays: source.paymentDays ?? undefined,
         leitwegId: source.leitwegId ?? undefined,
         einvoiceProfile: (source.einvoiceProfile as "ZUGFERD_EXTENDED" | "XRECHNUNG" | null | undefined),
+        globalDiscountPct: source.globalDiscountPct ?? "0.00",
+        globalDiscountType: (source.globalDiscountType ?? "pct") as "pct" | "abs",
+        layoutOverride: source.layoutOverride ?? undefined,
         lineItems: (source.lineItems ?? []).map((li) => ({
           position: li.position,
           lineType: li.lineType as "ITEM" | "TEXT" | "SUBTOTAL" | "PAGEBREAK",
@@ -282,7 +304,7 @@ export async function documentRoutes(app: FastifyInstance) {
           unit: li.unit,
           // Negate unit price so the Gutschrift reverses the original amounts
           unitPrice: li.lineType === "ITEM"
-            ? (li.unitPrice.startsWith("-") ? li.unitPrice : `-${li.unitPrice}`)
+            ? new Decimal(li.unitPrice).negated().toFixed(2)
             : li.unitPrice,
           discountPct: li.discountPct,
           discountType: (li.discountType ?? "pct") as "pct" | "abs",
@@ -303,8 +325,8 @@ export async function documentRoutes(app: FastifyInstance) {
       with: { lineItems: true },
     });
     if (!source) return reply.status(404).send({ message: "Beleg nicht gefunden" });
-    if (!["QUOTE", "INVOICE"].includes(source.documentType)) {
-      return reply.status(409).send({ message: "Nur Angebote und Rechnungen können als Lieferschein erstellt werden" });
+    if (source.documentType !== "INVOICE") {
+      return reply.status(409).send({ message: "Nur Rechnungen können als Lieferschein erstellt werden" });
     }
 
     const delivery = await createDocument(

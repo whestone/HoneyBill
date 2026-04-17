@@ -39,7 +39,8 @@ export async function openItemsRoutes(app: FastifyInstance) {
     for (const cn of creditNotes) {
       if (cn.cancelsDocumentId == null) continue;
       const prev = creditNotesByInvoice.get(cn.cancelsDocumentId) ?? new Decimal(0);
-      creditNotesByInvoice.set(cn.cancelsDocumentId, prev.plus(new Decimal(cn.totalGross)));
+      // totalGross of credit notes is negative — store as positive amount to subtract correctly
+      creditNotesByInvoice.set(cn.cancelsDocumentId, prev.plus(new Decimal(cn.totalGross).abs()));
     }
 
     const today = new Date().toISOString().slice(0, 10);
@@ -94,7 +95,8 @@ export async function openItemsRoutes(app: FastifyInstance) {
     for (const cn of summaryCreditNotes) {
       if (cn.cancelsDocumentId == null) continue;
       const prev = summaryCreditMap.get(cn.cancelsDocumentId) ?? new Decimal(0);
-      summaryCreditMap.set(cn.cancelsDocumentId, prev.plus(new Decimal(cn.totalGross)));
+      // totalGross of credit notes is negative — store as positive amount to subtract correctly
+      summaryCreditMap.set(cn.cancelsDocumentId, prev.plus(new Decimal(cn.totalGross).abs()));
     }
 
     const today = new Date().toISOString().slice(0, 10);
