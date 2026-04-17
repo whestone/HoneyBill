@@ -915,7 +915,8 @@ function ProductAutocomplete({
   anchorRef: React.RefObject<HTMLDivElement | null>;
   onSelect: (p: Product) => void;
 }) {
-  const [style, setStyle] = useState<React.CSSProperties>({});
+  // Start off-screen and fixed so the element never enters normal flow before position is calculated
+  const [style, setStyle] = useState<React.CSSProperties>({ position: "fixed", top: -9999, left: -9999 });
 
   useEffect(() => {
     if (anchorRef.current) {
