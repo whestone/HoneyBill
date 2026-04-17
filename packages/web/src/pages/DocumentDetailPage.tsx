@@ -90,7 +90,8 @@ export function DocumentDetailPage() {
   const finalizedCreditNotes = relatedDocs.filter(
     (d) => d.documentType === "CREDIT_NOTE" && ["FINAL", "SENT", "PAID"].includes(d.status)
   );
-  const totalCredited = finalizedCreditNotes.reduce((acc, cn) => acc + parseFloat(cn.totalGross), 0);
+  // totalGross of credit notes is negative — use abs so the open amount is reduced, not increased
+  const totalCredited = finalizedCreditNotes.reduce((acc, cn) => acc + Math.abs(parseFloat(cn.totalGross)), 0);
   const openAmount = parseFloat(doc.totalGross) - totalPaid - totalCredited;
 
   // Derive effective display status — credit notes can settle an invoice without changing DB status
