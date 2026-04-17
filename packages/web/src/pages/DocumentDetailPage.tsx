@@ -115,7 +115,9 @@ export function DocumentDetailPage() {
               <TypeBadge type={doc.documentType as DocumentType} />
               <StatusBadge status={effectiveStatus as any} />
             </div>
-            <p className="text-sm text-gray-500 mt-0.5">{customerName}</p>
+            <Link to="/customers/$id" params={{ id: String(doc.customerId) }} className="text-sm text-gray-500 mt-0.5 hover:text-honey-600 hover:underline">
+              {customerName}
+            </Link>
           </div>
         </div>
 
@@ -482,7 +484,9 @@ export function DocumentDetailPage() {
           <div className="card p-4">
             <h2 className="font-semibold text-sm text-gray-900 mb-3">Kunde</h2>
             <div className="text-sm space-y-1 text-gray-600">
-              <p className="font-medium text-gray-900">{customerName}</p>
+              <Link to="/customers/$id" params={{ id: String(doc.customerId) }} className="font-medium text-gray-900 hover:text-honey-600 hover:underline">
+                {customerName}
+              </Link>
               {customer?.billStreet && <p>{customer.billStreet}</p>}
               {(customer?.billZip || customer?.billCity) && (
                 <p>{[customer?.billZip, customer?.billCity].filter(Boolean).join(" ")}</p>

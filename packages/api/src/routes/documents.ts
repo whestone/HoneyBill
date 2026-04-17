@@ -248,6 +248,9 @@ export async function documentRoutes(app: FastifyInstance) {
         paymentDays: source.paymentDays ?? undefined,
         leitwegId: source.leitwegId ?? undefined,
         einvoiceProfile: (source.einvoiceProfile as "ZUGFERD_EXTENDED" | "XRECHNUNG" | null | undefined),
+        globalDiscountPct: source.globalDiscountPct ?? "0.00",
+        globalDiscountType: (source.globalDiscountType ?? "pct") as "pct" | "abs",
+        layoutOverride: source.layoutOverride ?? undefined,
         lineItems: (source.lineItems ?? []).map((li) => ({
           position: li.position,
           lineType: li.lineType as "ITEM" | "TEXT" | "SUBTOTAL" | "PAGEBREAK",
