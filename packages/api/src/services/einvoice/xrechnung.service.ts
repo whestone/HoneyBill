@@ -163,9 +163,6 @@ const CII_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
       <ram:BuyerReference>{{buyerLeitwegId}}</ram:BuyerReference>
       <ram:SellerTradeParty>
         <ram:Name>{{sellerName}}</ram:Name>
-        <ram:SpecifiedTaxRegistration>
-          <ram:ID schemeID="VA">{{sellerVatId}}</ram:ID>
-        </ram:SpecifiedTaxRegistration>
         <ram:PostalTradeAddress>
           <ram:PostcodeCode>{{sellerZip}}</ram:PostcodeCode>
           <ram:LineOne>{{sellerStreet}}</ram:LineOne>
@@ -175,18 +172,21 @@ const CII_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
         <ram:URIUniversalCommunication>
           <ram:URIID schemeID="EM">{{sellerEmail}}</ram:URIID>
         </ram:URIUniversalCommunication>
+        <ram:SpecifiedTaxRegistration>
+          <ram:ID schemeID="VA">{{sellerVatId}}</ram:ID>
+        </ram:SpecifiedTaxRegistration>
       </ram:SellerTradeParty>
       <ram:BuyerTradeParty>
         <ram:Name>{{buyerName}}</ram:Name>
-        <ram:SpecifiedTaxRegistration>
-          <ram:ID schemeID="VA">{{buyerVatId}}</ram:ID>
-        </ram:SpecifiedTaxRegistration>
         <ram:PostalTradeAddress>
           <ram:PostcodeCode>{{buyerZip}}</ram:PostcodeCode>
           <ram:LineOne>{{buyerStreet}}</ram:LineOne>
           <ram:CityName>{{buyerCity}}</ram:CityName>
           <ram:CountryID>{{buyerCountry}}</ram:CountryID>
         </ram:PostalTradeAddress>
+        <ram:SpecifiedTaxRegistration>
+          <ram:ID schemeID="VA">{{buyerVatId}}</ram:ID>
+        </ram:SpecifiedTaxRegistration>
       </ram:BuyerTradeParty>
     </ram:ApplicableHeaderTradeAgreement>
     <!-- Delivery -->
