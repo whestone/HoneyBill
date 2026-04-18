@@ -3,21 +3,19 @@
   "configurations": [
     {
       "name": "HoneyBill (API + Web, beide gleichzeitig)",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "dev"
-      ],
+      "runtimeExecutable": "C:\\Windows\\System32\\cmd.exe",
+      "runtimeArgs": ["/c", "dev.cmd"],
       "port": 5173
     },
     {
       "name": "HoneyBill API (Fastify, Port 3001)",
-      "runtimeExecutable": "pnpm",
+      "runtimeExecutable": "C:\\Users\\Test\\AppData\\Roaming\\npm\\pnpm.cmd",
       "runtimeArgs": ["--filter", "@honeybill/api", "dev"],
       "port": 3001
     },
     {
       "name": "HoneyBill Web (Vite, Port 5173)",
-      "runtimeExecutable": "pnpm",
+      "runtimeExecutable": "C:\\Users\\Test\\AppData\\Roaming\\npm\\pnpm.cmd",
       "runtimeArgs": ["--filter", "@honeybill/web", "dev"],
       "port": 5173
     }
