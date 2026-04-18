@@ -11,13 +11,15 @@ export function generateXRechnungXml(
   return Mustache.render(CII_TEMPLATE, view);
 }
 
-/** Build ZUGFeRD 2.3 EXTENDED XML (same CII format, different GuidelineID). */
+/** Build ZUGFeRD 2.3 XML (Profile: XRECHNUNG — universell valide: KoSIT + ZUGFeRD-Validatoren).
+ *  Identische CII-Struktur wie XRechnung, damit die XML sowohl standalone als auch
+ *  als factur-x.xml in PDF/A-3 eingebettet validiert. */
 export function generateZugferdXml(
   doc: Document & { lineItems: NonNullable<Document["lineItems"]>; taxLines: NonNullable<Document["taxLines"]> },
   customer: Customer,
   company: CompanySettings
 ): string {
-  const view = buildCiiView(doc, customer, company, "urn:cen.eu:en16931:2017#conformant#urn:factur-x.eu:1p0:extended");
+  const view = buildCiiView(doc, customer, company, "urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0");
   return Mustache.render(CII_TEMPLATE, view);
 }
 
