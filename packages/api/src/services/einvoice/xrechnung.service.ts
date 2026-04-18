@@ -130,7 +130,11 @@ function buildCiiView(
     buyerCountry: customer.billCountry,
     buyerVatId: escapeXml(customer.vatId ?? ""),
     buyerEmail,
-    buyerLeitwegId: escapeXml(doc.leitwegId ?? customer.leitwegId ?? ""),
+    // BT-10 (BuyerReference) ist in XRechnung Pflicht — Fallback auf Rechnungsnummer,
+    // wenn keine Leitweg-ID / Bestellreferenz gepflegt ist.
+    buyerLeitwegId: escapeXml(
+      doc.leitwegId ?? customer.leitwegId ?? doc.documentNumber ?? "N/A"
+    ),
     // Totals
     subtotalNet: doc.subtotalNet,
     totalTax: doc.totalTax,
@@ -235,9 +239,9 @@ const CII_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
           {{/sellerEmail}}
         </ram:DefinedTradeContact>
         <ram:PostalTradeAddress>
-          <ram:PostcodeCode>{{sellerZip}}</ram:PostcodeCode>
-          <ram:LineOne>{{sellerStreet}}</ram:LineOne>
-          <ram:CityName>{{sellerCity}}</ram:CityName>
+          {{#sellerZip}}<ram:PostcodeCode>{{sellerZip}}</ram:PostcodeCode>{{/sellerZip}}
+          {{#sellerStreet}}<ram:LineOne>{{sellerStreet}}</ram:LineOne>{{/sellerStreet}}
+          {{#sellerCity}}<ram:CityName>{{sellerCity}}</ram:CityName>{{/sellerCity}}
           <ram:CountryID>{{sellerCountry}}</ram:CountryID>
         </ram:PostalTradeAddress>
         {{#sellerEmail}}
@@ -252,9 +256,9 @@ const CII_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
       <ram:BuyerTradeParty>
         <ram:Name>{{buyerName}}</ram:Name>
         <ram:PostalTradeAddress>
-          <ram:PostcodeCode>{{buyerZip}}</ram:PostcodeCode>
-          <ram:LineOne>{{buyerStreet}}</ram:LineOne>
-          <ram:CityName>{{buyerCity}}</ram:CityName>
+          {{#buyerZip}}<ram:PostcodeCode>{{buyerZip}}</ram:PostcodeCode>{{/buyerZip}}
+          {{#buyerStreet}}<ram:LineOne>{{buyerStreet}}</ram:LineOne>{{/buyerStreet}}
+          {{#buyerCity}}<ram:CityName>{{buyerCity}}</ram:CityName>{{/buyerCity}}
           <ram:CountryID>{{buyerCountry}}</ram:CountryID>
         </ram:PostalTradeAddress>
         {{#buyerEmail}}
