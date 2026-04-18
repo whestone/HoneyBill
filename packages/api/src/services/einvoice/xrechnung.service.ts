@@ -11,14 +11,39 @@ export function generateXRechnungXml(
   return Mustache.render(CII_TEMPLATE, view);
 }
 
-/** Build ZUGFeRD 2.3 EXTENDED XML (same CII format, different GuidelineID). */
+/** Build ZUGFeRD 2.3 XML (Profile: XRECHNUNG — universell valide: KoSIT + ZUGFeRD-Validatoren).
+ *  Identische CII-Struktur wie XRechnung, damit die XML sowohl standalone als auch
+ *  als factur-x.xml in PDF/A-3 eingebettet validiert. */
 export function generateZugferdXml(
   doc: Document & { lineItems: NonNullable<Document["lineItems"]>; taxLines: NonNullable<Document["taxLines"]> },
   customer: Customer,
   company: CompanySettings
 ): string {
-  const view = buildCiiView(doc, customer, company, "urn:cen.eu:en16931:2017#conformant#urn:factur-x.eu:1p0:extended");
+  const view = buildCiiView(doc, customer, company, "urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0");
   return Mustache.render(CII_TEMPLATE, view);
+}
+
+/** UNCL 5305 tax category codes (allowed values). */
+const UNCL_5305_CATEGORIES = new Set(["S", "Z", "E", "AE", "K", "G", "O", "L", "M"]);
+
+/** Map internal tax category to a valid UNCL 5305 code.
+ *  German reduced rate (7%) is still category "S" (no separate "R" in UNCL 5305). */
+function mapCategoryCode(code: string | null | undefined): string {
+  const c = (code ?? "").toUpperCase().trim();
+  if (UNCL_5305_CATEGORIES.has(c)) return c;
+  return "S"; // fallback for legacy "R" / reduced / unset
+}
+
+/** Normalize VAT rate to 2 decimals so "9.5" and "9.50" compare equal. */
+function normalizeRate(rate: string | number | null | undefined): string {
+  const n = typeof rate === "number" ? rate : parseFloat(String(rate ?? "0"));
+  if (Number.isNaN(n)) return "0.00";
+  return n.toFixed(2);
+}
+
+function toAmount(amount: string | number | null | undefined): number {
+  const n = typeof amount === "number" ? amount : parseFloat(String(amount ?? "0"));
+  return Number.isNaN(n) ? 0 : n;
 }
 
 function buildCiiView(
@@ -40,11 +65,45 @@ function buildCiiView(
       unit: mapUnit(li.unit),
       unitPrice: li.unitPrice,
       lineNet: li.lineNet,
-      taxPercent: li.taxRatePct,
-      taxCategoryCode: "S", // simplified; extend per taxLine if needed
+      taxPercent: normalizeRate(li.taxRatePct),
+      taxCategoryCode: "S",
     }));
 
+  // Aggregate tax lines by (category, rate) to fulfil BR-S-08.
+  const taxMap = new Map<string, { taxCategoryCode: string; taxPercent: string; taxableAmount: number; taxAmount: number }>();
+  for (const tl of doc.taxLines) {
+    const cat = mapCategoryCode(tl.taxCategory);
+    const rate = normalizeRate(tl.taxRatePct);
+    const key = `${cat}|${rate}`;
+    const existing = taxMap.get(key);
+    if (existing) {
+      existing.taxableAmount += toAmount(tl.taxableAmount);
+      existing.taxAmount += toAmount(tl.taxAmount);
+    } else {
+      taxMap.set(key, {
+        taxCategoryCode: cat,
+        taxPercent: rate,
+        taxableAmount: toAmount(tl.taxableAmount),
+        taxAmount: toAmount(tl.taxAmount),
+      });
+    }
+  }
+  const taxLines = [...taxMap.values()].map((t) => ({
+    taxCategoryCode: t.taxCategoryCode,
+    taxPercent: t.taxPercent,
+    taxableAmount: t.taxableAmount.toFixed(2),
+    taxAmount: t.taxAmount.toFixed(2),
+  }));
+
+  const sellerContactName = escapeXml(company.name ?? "");
+  const sellerPhone = escapeXml(company.phone ?? "");
+  const sellerEmail = escapeXml(company.email ?? "");
+
+  const buyerEmail = escapeXml(customer.email ?? "");
+
   return {
+    // Default BusinessProcess for XRechnung (BT-23)
+    businessProcess: "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0",
     guidelineId,
     invoiceNumber: escapeXml(doc.documentNumber ?? ""),
     issueDate,
@@ -59,7 +118,9 @@ function buildCiiView(
     sellerCountry: company.country,
     sellerVatId: escapeXml(company.vatId ?? ""),
     sellerTaxNumber: escapeXml(company.taxNumber ?? ""),
-    sellerEmail: escapeXml(company.email ?? ""),
+    sellerEmail,
+    sellerPhone,
+    sellerContactName,
     sellerIban: escapeXml(company.bankIban ?? ""),
     sellerBic: escapeXml(company.bankBic ?? ""),
     sellerBankName: escapeXml(company.bankName ?? ""),
@@ -70,18 +131,18 @@ function buildCiiView(
     buyerZip: escapeXml(customer.billZip ?? ""),
     buyerCountry: customer.billCountry,
     buyerVatId: escapeXml(customer.vatId ?? ""),
-    buyerLeitwegId: escapeXml(doc.leitwegId ?? customer.leitwegId ?? ""),
+    buyerEmail,
+    // BT-10 (BuyerReference) ist in XRechnung Pflicht — Fallback auf Rechnungsnummer,
+    // wenn keine Leitweg-ID / Bestellreferenz gepflegt ist.
+    buyerLeitwegId: escapeXml(
+      doc.leitwegId ?? customer.leitwegId ?? doc.documentNumber ?? "N/A"
+    ),
     // Totals
     subtotalNet: doc.subtotalNet,
     totalTax: doc.totalTax,
     totalGross: doc.totalGross,
-    // Tax lines
-    taxLines: doc.taxLines.map((tl) => ({
-      taxPercent: tl.taxRatePct,
-      taxCategoryCode: tl.taxCategory,
-      taxableAmount: tl.taxableAmount,
-      taxAmount: tl.taxAmount,
-    })),
+    // Tax lines (aggregated + normalized)
+    taxLines,
     // Line items
     lines,
     paymentTermsText: escapeXml(doc.paymentTermsText ?? `Zahlungsziel: ${doc.paymentDays ?? 14} Tage`),
@@ -117,6 +178,9 @@ const CII_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
   xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100"
   xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
   <rsm:ExchangedDocumentContext>
+    <ram:BusinessProcessSpecifiedDocumentContextParameter>
+      <ram:ID>{{{businessProcess}}}</ram:ID>
+    </ram:BusinessProcessSpecifiedDocumentContextParameter>
     <ram:GuidelineSpecifiedDocumentContextParameter>
       <ram:ID>{{{guidelineId}}}</ram:ID>
     </ram:GuidelineSpecifiedDocumentContextParameter>
@@ -163,30 +227,52 @@ const CII_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
       <ram:BuyerReference>{{buyerLeitwegId}}</ram:BuyerReference>
       <ram:SellerTradeParty>
         <ram:Name>{{sellerName}}</ram:Name>
-        <ram:SpecifiedTaxRegistration>
-          <ram:ID schemeID="VA">{{sellerVatId}}</ram:ID>
-        </ram:SpecifiedTaxRegistration>
+        <ram:DefinedTradeContact>
+          <ram:PersonName>{{sellerContactName}}</ram:PersonName>
+          {{#sellerPhone}}
+          <ram:TelephoneUniversalCommunication>
+            <ram:CompleteNumber>{{sellerPhone}}</ram:CompleteNumber>
+          </ram:TelephoneUniversalCommunication>
+          {{/sellerPhone}}
+          {{#sellerEmail}}
+          <ram:EmailURIUniversalCommunication>
+            <ram:URIID schemeID="SMTP">{{sellerEmail}}</ram:URIID>
+          </ram:EmailURIUniversalCommunication>
+          {{/sellerEmail}}
+        </ram:DefinedTradeContact>
         <ram:PostalTradeAddress>
-          <ram:PostcodeCode>{{sellerZip}}</ram:PostcodeCode>
-          <ram:LineOne>{{sellerStreet}}</ram:LineOne>
-          <ram:CityName>{{sellerCity}}</ram:CityName>
+          {{#sellerZip}}<ram:PostcodeCode>{{sellerZip}}</ram:PostcodeCode>{{/sellerZip}}
+          {{#sellerStreet}}<ram:LineOne>{{sellerStreet}}</ram:LineOne>{{/sellerStreet}}
+          {{#sellerCity}}<ram:CityName>{{sellerCity}}</ram:CityName>{{/sellerCity}}
           <ram:CountryID>{{sellerCountry}}</ram:CountryID>
         </ram:PostalTradeAddress>
+        {{#sellerEmail}}
         <ram:URIUniversalCommunication>
           <ram:URIID schemeID="EM">{{sellerEmail}}</ram:URIID>
         </ram:URIUniversalCommunication>
+        {{/sellerEmail}}
+        <ram:SpecifiedTaxRegistration>
+          <ram:ID schemeID="VA">{{sellerVatId}}</ram:ID>
+        </ram:SpecifiedTaxRegistration>
       </ram:SellerTradeParty>
       <ram:BuyerTradeParty>
         <ram:Name>{{buyerName}}</ram:Name>
+        <ram:PostalTradeAddress>
+          {{#buyerZip}}<ram:PostcodeCode>{{buyerZip}}</ram:PostcodeCode>{{/buyerZip}}
+          {{#buyerStreet}}<ram:LineOne>{{buyerStreet}}</ram:LineOne>{{/buyerStreet}}
+          {{#buyerCity}}<ram:CityName>{{buyerCity}}</ram:CityName>{{/buyerCity}}
+          <ram:CountryID>{{buyerCountry}}</ram:CountryID>
+        </ram:PostalTradeAddress>
+        {{#buyerEmail}}
+        <ram:URIUniversalCommunication>
+          <ram:URIID schemeID="EM">{{buyerEmail}}</ram:URIID>
+        </ram:URIUniversalCommunication>
+        {{/buyerEmail}}
+        {{#buyerVatId}}
         <ram:SpecifiedTaxRegistration>
           <ram:ID schemeID="VA">{{buyerVatId}}</ram:ID>
         </ram:SpecifiedTaxRegistration>
-        <ram:PostalTradeAddress>
-          <ram:PostcodeCode>{{buyerZip}}</ram:PostcodeCode>
-          <ram:LineOne>{{buyerStreet}}</ram:LineOne>
-          <ram:CityName>{{buyerCity}}</ram:CityName>
-          <ram:CountryID>{{buyerCountry}}</ram:CountryID>
-        </ram:PostalTradeAddress>
+        {{/buyerVatId}}
       </ram:BuyerTradeParty>
     </ram:ApplicableHeaderTradeAgreement>
     <!-- Delivery -->
