@@ -903,7 +903,12 @@ function TaxRatesTab() {
               </tr>
             </thead>
             <tbody>
-              {taxRates.map((tr) => (
+              {taxRates.map((tr) => {
+                const inUse = (tr.usageProducts ?? 0) + (tr.usageLineItems ?? 0);
+                const deleteBlockedReason = inUse > 0
+                  ? `Kann nicht gelöscht werden – verwendet in ${tr.usageProducts ?? 0} Produkt(en) und ${tr.usageLineItems ?? 0} Rechnungsposition(en). GoBD-konform bleibt dieser Satz referenzierbar.`
+                  : null;
+                return (
                 <tr key={tr.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="table-cell font-medium">{tr.name}</td>
                   <td className="table-cell text-right font-mono">{parseFloat(tr.ratePercent).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} %</td>
@@ -928,15 +933,21 @@ function TaxRatesTab() {
                       </button>
                       <button
                         onClick={async () => { if (await confirm(`Steuersatz "${tr.name}" löschen?`, { title: "Steuersatz löschen", confirmLabel: "Löschen" })) deleteTaxRate.mutate(tr.id); }}
-                        className="text-gray-300 hover:text-red-500 transition-colors p-1"
-                        title="Löschen"
+                        disabled={!!deleteBlockedReason}
+                        className={
+                          deleteBlockedReason
+                            ? "text-gray-200 cursor-not-allowed p-1"
+                            : "text-gray-300 hover:text-red-500 transition-colors p-1"
+                        }
+                        title={deleteBlockedReason ?? "Löschen"}
                       >
                         <Trash2 size={14} />
                       </button>
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {!taxRates.length && (
                 <tr>
                   <td colSpan={7} className="table-cell text-center text-gray-400 py-8">

@@ -40,6 +40,10 @@ export interface TaxRate {
   validTo: string | null;
   isDefault: boolean;
   createdAt: string;
+  // Nur von GET /tax-rates geliefert: Anzahl Referenzen in Produkten / Rechnungspositionen.
+  // Wenn >0, ist Loeschen nicht erlaubt (GoBD-Schutz).
+  usageProducts?: number;
+  usageLineItems?: number;
 }
 
 export interface Customer {

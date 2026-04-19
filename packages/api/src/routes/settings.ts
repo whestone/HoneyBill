@@ -191,7 +191,34 @@ export async function taxRateRoutes(app: FastifyInstance) {
     } else {
       rows = await db.select().from(taxRates).orderBy(taxRates.validFrom);
     }
-    return reply.send(rows);
+
+    // Usage-Counts anhaengen, damit die UI "Loeschen"-Buttons passend deaktivieren kann.
+    // Zwei Aggregat-Queries sind billiger als N+1.
+    const rateIds = rows.map((r) => r.id);
+    const usage = new Map<number, { products: number; lineItems: number }>();
+    for (const id of rateIds) usage.set(id, { products: 0, lineItems: 0 });
+    if (rateIds.length > 0) {
+      const idList = rateIds.join(",");
+      const prodRows = sqlite
+        .prepare(
+          `SELECT tax_rate_id AS id, COUNT(*) AS c FROM products WHERE tax_rate_id IN (${idList}) GROUP BY tax_rate_id`,
+        )
+        .all() as { id: number; c: number }[];
+      for (const r of prodRows) usage.get(r.id)!.products = r.c;
+      const liRows = sqlite
+        .prepare(
+          `SELECT tax_rate_id AS id, COUNT(*) AS c FROM document_line_items WHERE tax_rate_id IN (${idList}) GROUP BY tax_rate_id`,
+        )
+        .all() as { id: number; c: number }[];
+      for (const r of liRows) usage.get(r.id)!.lineItems = r.c;
+    }
+
+    const enriched = rows.map((r) => ({
+      ...r,
+      usageProducts: usage.get(r.id)?.products ?? 0,
+      usageLineItems: usage.get(r.id)?.lineItems ?? 0,
+    }));
+    return reply.send(enriched);
   });
 
   // POST /api/v1/tax-rates
