@@ -162,6 +162,7 @@ export const numberSeries = sqliteTable("number_series", {
   nextCounter: int("next_counter").notNull().default(1),
   lastResetAt: text("last_reset_at"),
   resetYearly: int("reset_yearly", { mode: "boolean" }).notNull().default(true),
+  resetMonthly: int("reset_monthly", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
 });

@@ -106,6 +106,7 @@ export interface NumberSeries {
   nextCounter: number;
   lastResetAt: string | null;
   resetYearly: boolean;
+  resetMonthly: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -417,6 +418,7 @@ export interface NumberSeries {
   nextCounter: number;
   lastResetAt: string | null;
   resetYearly: boolean;
+  resetMonthly: boolean;
   createdAt: string;
   updatedAt: string;
 }

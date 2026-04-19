@@ -28,6 +28,7 @@ export const UpdateNumberSeriesSchema = z.object({
   format: z.string().max(100).nullable().optional(),
   nextCounter: z.number().int().min(1).optional(),
   resetYearly: z.boolean().optional(),
+  resetMonthly: z.boolean().optional(),
 });
 
 const DocumentLayoutSettingsSchema = z.object({

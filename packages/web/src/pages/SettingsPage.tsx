@@ -1304,7 +1304,10 @@ function NumberSeriesCard({ series, onSaved }: { series: NumberSeries; onSaved: 
 
   const [format, setFormat] = useState(defaultFormat);
   const [nextCounter, setNextCounter] = useState(String(series.nextCounter));
-  const [resetYearly, setResetYearly] = useState(series.resetYearly);
+  // "never" | "yearly" | "monthly" — monatlich hat Vorrang wenn beides in der DB steht.
+  const [resetPeriod, setResetPeriod] = useState<"never" | "yearly" | "monthly">(
+    series.resetMonthly ? "monthly" : series.resetYearly ? "yearly" : "never",
+  );
   const [preview, setPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -1335,7 +1338,8 @@ function NumberSeriesCard({ series, onSaved }: { series: NumberSeries; onSaved: 
       await api.put(`/number-series/${series.documentType}`, {
         format,
         nextCounter: Number(nextCounter),
-        resetYearly,
+        resetYearly: resetPeriod === "yearly",
+        resetMonthly: resetPeriod === "monthly",
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -1381,16 +1385,21 @@ function NumberSeriesCard({ series, onSaved }: { series: NumberSeries; onSaved: 
             onChange={(e) => setNextCounter(e.target.value)}
           />
         </div>
-        <div className="flex items-end pb-1">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={resetYearly}
-              onChange={(e) => setResetYearly(e.target.checked)}
-              className="rounded"
-            />
-            <span className="text-sm text-gray-700">Jährlich zurücksetzen</span>
-          </label>
+        <div>
+          <label className="label">Zähler zurücksetzen</label>
+          <select
+            className="input"
+            value={resetPeriod}
+            onChange={(e) => setResetPeriod(e.target.value as "never" | "yearly" | "monthly")}
+          >
+            <option value="never">Nie</option>
+            <option value="yearly">Jährlich (Jan. = 1)</option>
+            <option value="monthly">Monatlich (1. des Monats = 1)</option>
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            {resetPeriod === "monthly" && "Tipp: {MM} im Format verwenden, damit Nummern pro Monat eindeutig bleiben."}
+            {resetPeriod === "yearly" && "Tipp: {YYYY} im Format verwenden, damit Nummern pro Jahr eindeutig bleiben."}
+          </p>
         </div>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}

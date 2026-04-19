@@ -12,7 +12,27 @@ interface SeriesRow {
   next_counter: number;
   last_reset_at: string | null;
   reset_yearly: number;
+  reset_monthly: number;
   format: string | null;
+}
+
+/**
+ * Entscheidet, ob der Zaehler fuer das gegebene Ausstellungsdatum zurueckgesetzt
+ * werden muss. Monatlich schlaegt jaehrlich: wenn beide Flags aktiv sind, reicht
+ * ein Monatswechsel fuer den Reset.
+ *
+ * - reset_monthly: reset bei Wechsel des Jahr-Monats (YYYY-MM)
+ * - reset_yearly:  reset bei Wechsel des Jahres (YYYY)
+ */
+function shouldReset(series: SeriesRow, issueDate: string): boolean {
+  if (!series.last_reset_at) return false; // erster Run — nichts zurueckzusetzen
+  if (series.reset_monthly) {
+    return series.last_reset_at.slice(0, 7) !== issueDate.slice(0, 7);
+  }
+  if (series.reset_yearly) {
+    return series.last_reset_at.slice(0, 4) !== issueDate.slice(0, 4);
+  }
+  return false;
 }
 
 /**
@@ -67,11 +87,8 @@ export function assignNextNumber(sqlite: BetterSQLite3, documentType: DocumentTy
       throw new Error(`No number series configured for document type: ${documentType}`);
     }
 
-    // Handle yearly reset
-    const issueYear = issueDate.slice(0, 4);
     let counter = series.next_counter;
-
-    if (series.reset_yearly && series.last_reset_at?.slice(0, 4) !== issueYear) {
+    if (shouldReset(series, issueDate)) {
       counter = 1;
     }
 
@@ -97,10 +114,8 @@ export function previewNextNumber(sqlite: BetterSQLite3, documentType: DocumentT
   if (!series) return "???";
 
   const today = new Date().toISOString().slice(0, 10);
-  const issueYear = today.slice(0, 4);
   let counter = series.next_counter;
-
-  if (series.reset_yearly && series.last_reset_at?.slice(0, 4) !== issueYear) {
+  if (shouldReset(series, today)) {
     counter = 1;
   }
 
