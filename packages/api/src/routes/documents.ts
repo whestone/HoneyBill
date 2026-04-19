@@ -19,6 +19,13 @@ import { generateZugferdXml, generateXRechnungXml } from "../services/einvoice/x
 import { packageZugferdPdf } from "../services/einvoice/zugferd.service.js";
 import { db as rawDb } from "../db/index.js";
 import type { Customer, CompanySettings, Document } from "@honeybill/shared";
+
+/** Document as returned by getFullDocument() — lineItems & taxLines are guaranteed present. */
+type FullDocument = Document & {
+  lineItems: NonNullable<Document["lineItems"]>;
+  taxLines: NonNullable<Document["taxLines"]>;
+  customer?: Customer;
+};
 import { companySettings, customers } from "../db/schema.js";
 import path from "node:path";
 import fs from "node:fs";
@@ -262,7 +269,11 @@ export async function documentRoutes(app: FastifyInstance) {
         einvoiceProfile: (source.einvoiceProfile as "ZUGFERD_EXTENDED" | "XRECHNUNG" | null | undefined),
         globalDiscountPct: source.globalDiscountPct ?? "0.00",
         globalDiscountType: (source.globalDiscountType ?? "pct") as "pct" | "abs",
-        layoutOverride: source.layoutOverride ?? undefined,
+        layoutOverride: source.layoutOverride
+          ? (typeof source.layoutOverride === "string"
+              ? JSON.parse(source.layoutOverride)
+              : source.layoutOverride)
+          : undefined,
         lineItems: (source.lineItems ?? []).map((li) => ({
           position: li.position,
           lineType: li.lineType as "ITEM" | "TEXT" | "SUBTOTAL" | "PAGEBREAK",
@@ -464,7 +475,7 @@ export async function documentRoutes(app: FastifyInstance) {
     const doc = await getFullDocument(Number((req.params as { id: string }).id));
     if (!doc) return reply.status(404).send({ message: "Beleg nicht gefunden" });
     const company = await getCompanySettings();
-    const xml = generateXRechnungXml(doc as any, doc.customer as Customer, company);
+    const xml = generateXRechnungXml(doc as unknown as FullDocument, doc.customer as Customer, company);
     reply
       .header("Content-Type", "application/xml")
       .header("Content-Disposition", `attachment; filename="xrechnung-${doc.documentNumber}.xml"`);
@@ -478,11 +489,12 @@ export async function documentRoutes(app: FastifyInstance) {
     const doc = await getFullDocument(Number(id));
     if (!doc) return reply.status(404).send({ message: "Beleg nicht gefunden" });
 
-    const data = await (req as any).file();
+    const data = await req.file();
+    if (!data) return reply.status(400).send({ message: "Kein PDF im Request" });
     const pdfBytes = await data.toBuffer();
 
     const company = await getCompanySettings();
-    const xml = generateZugferdXml(doc as any, doc.customer as Customer, company);
+    const xml = generateZugferdXml(doc as unknown as FullDocument, doc.customer as Customer, company);
     const zugferdPdf = await packageZugferdPdf(new Uint8Array(pdfBytes), xml);
 
     // Save to disk
