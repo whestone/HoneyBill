@@ -78,11 +78,22 @@ export const UpdateEmailSettingsSchema = z.object({
   ),
 });
 
+/**
+ * Anhang-Format fuer den E-Mail-Versand:
+ * - PDF: normale PDF (default)
+ * - ZUGFERD: PDF/A-3 mit eingebettetem CII-XML (ZUGFeRD 2.3, XRechnung-Profil)
+ * - XRECHNUNG: PDF + separate XRechnung-XML als zweiter Anhang
+ */
+export const EmailAttachFormatSchema = z.enum(["PDF", "ZUGFERD", "XRECHNUNG"]);
+export type EmailAttachFormat = z.infer<typeof EmailAttachFormatSchema>;
+
 export const SendDocumentEmailSchema = z.object({
   to: z.string().email(),
   subject: z.string().min(1).max(500),
   body: z.string().min(1).max(10000),
   attachPdf: z.boolean().default(true),
+  attachFormat: EmailAttachFormatSchema.default("PDF"),
+  documentId: z.coerce.number().int().positive().optional(),
 });
 
 export const CreateUserSchema = z.object({

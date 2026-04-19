@@ -508,7 +508,7 @@ export async function documentRoutes(app: FastifyInstance) {
   });
 }
 
-async function getFullDocument(id: number) {
+export async function getFullDocument(id: number) {
   return db.query.documents.findFirst({
     where: eq(documents.id, id),
     with: {
@@ -519,7 +519,7 @@ async function getFullDocument(id: number) {
   });
 }
 
-async function getCompanySettings() {
+export async function getCompanySettings() {
   const [row] = await db.select().from(companySettings).limit(1);
   return (row ?? {}) as CompanySettings;
 }

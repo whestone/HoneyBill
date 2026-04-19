@@ -617,6 +617,9 @@ function SendEmailModal({
   );
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message?: string } | null>(null);
+  // Anhang-Format: normale PDF, ZUGFeRD (PDF mit eingebettetem XML), oder PDF + separate XRechnung-XML.
+  const [attachFormat, setAttachFormat] = useState<"PDF" | "ZUGFERD" | "XRECHNUNG">("PDF");
+  const isFinalized = doc.status !== "DRAFT";
 
   const handleSend = async () => {
     setSending(true);
@@ -644,6 +647,8 @@ function SendEmailModal({
       form.append("subject", subject);
       form.append("body", body);
       form.append("attachPdf", "true");
+      form.append("attachFormat", attachFormat);
+      if (attachFormat !== "PDF") form.append("documentId", String(doc.id));
       form.append("file", pdfBlob, `${doc.documentNumber ?? "dokument"}.pdf`);
       const token = JSON.parse(localStorage.getItem("honeybill-auth") ?? "{}").state?.token ?? "";
       const res = await fetch("/api/v1/settings/company/email/send-document", {
@@ -687,9 +692,33 @@ function SendEmailModal({
             <textarea rows={10} value={body} onChange={(e) => setBody(e.target.value)} className="input w-full resize-y font-mono text-xs" />
           </div>
           {emailSettings.provider === "smtp" && (
-            <p className="text-xs text-gray-500">
-              Das PDF wird automatisch als Anhang beigefügt ({doc.documentNumber ?? "Entwurf"}.pdf).
-            </p>
+            <div className="space-y-2">
+              <label className="label">Anhang</label>
+              <select
+                className="input"
+                value={attachFormat}
+                onChange={(e) => setAttachFormat(e.target.value as "PDF" | "ZUGFERD" | "XRECHNUNG")}
+                disabled={!isFinalized && attachFormat !== "PDF"}
+              >
+                <option value="PDF">PDF</option>
+                <option value="ZUGFERD" disabled={!isFinalized}>
+                  ZUGFeRD PDF (PDF mit eingebettetem XML)
+                </option>
+                <option value="XRECHNUNG" disabled={!isFinalized}>
+                  PDF + XRechnung XML (zwei Anhänge)
+                </option>
+              </select>
+              {!isFinalized && (
+                <p className="text-xs text-amber-600">
+                  E-Rechnung-Formate sind erst nach Finalisierung verfügbar.
+                </p>
+              )}
+              <p className="text-xs text-gray-500">
+                {attachFormat === "PDF" && `Das PDF wird als Anhang beigefügt (${doc.documentNumber ?? "Entwurf"}.pdf).`}
+                {attachFormat === "ZUGFERD" && `ZUGFeRD PDF/A-3 mit eingebettetem CII-XML (XRechnung-Profil) — ein Anhang, vom Empfänger automatisch verarbeitbar.`}
+                {attachFormat === "XRECHNUNG" && `PDF plus separate XRechnung 3.0 XML — zwei Anhänge, fuer Public-Sector-Empfaenger.`}
+              </p>
+            </div>
           )}
           {result && (
             <p className={`text-sm ${result.ok ? "text-green-600" : "text-red-600"}`}>
