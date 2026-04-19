@@ -849,9 +849,15 @@ function TaxRatesTab() {
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<TaxRate | null>(null);
 
-  const { data: taxRates, isLoading } = useQuery<TaxRate[]>({
-    queryKey: ["tax-rates"],
-    queryFn: () => api.get("/tax-rates?active=true"),
+  const [showExpired, setShowExpired] = useState(false);
+  const { data: allTaxRates, isLoading } = useQuery<TaxRate[]>({
+    queryKey: ["tax-rates", "all"],
+    queryFn: () => api.get("/tax-rates"),
+  });
+  const today = new Date().toISOString().slice(0, 10);
+  const taxRates = (allTaxRates ?? []).filter((tr) => {
+    if (showExpired) return true;
+    return !tr.validTo || tr.validTo >= today;
   });
 
   const deleteTaxRate = useMutation({
@@ -865,9 +871,19 @@ function TaxRatesTab() {
         <p className="text-sm text-gray-500">
           Steuersätze mit Gültigkeitszeiträumen für korrekte historische Rückrechnung.
         </p>
-        <button onClick={() => setShowCreate(true)} className="btn-primary">
-          <Plus size={14} /> Neuer Steuersatz
-        </button>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-xs text-gray-500">
+            <input
+              type="checkbox"
+              checked={showExpired}
+              onChange={(e) => setShowExpired(e.target.checked)}
+            />
+            Abgelaufene anzeigen
+          </label>
+          <button onClick={() => setShowCreate(true)} className="btn-primary">
+            <Plus size={14} /> Neuer Steuersatz
+          </button>
+        </div>
       </div>
 
       <div className="card overflow-hidden">
@@ -887,7 +903,7 @@ function TaxRatesTab() {
               </tr>
             </thead>
             <tbody>
-              {(taxRates ?? []).map((tr) => (
+              {taxRates.map((tr) => (
                 <tr key={tr.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="table-cell font-medium">{tr.name}</td>
                   <td className="table-cell text-right font-mono">{parseFloat(tr.ratePercent).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} %</td>
@@ -921,7 +937,7 @@ function TaxRatesTab() {
                   </td>
                 </tr>
               ))}
-              {!(taxRates ?? []).length && (
+              {!taxRates.length && (
                 <tr>
                   <td colSpan={7} className="table-cell text-center text-gray-400 py-8">
                     Keine Steuersätze vorhanden
