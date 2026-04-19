@@ -41,6 +41,11 @@ export const auditLog = sqliteTable("audit_log", {
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+  // GoBD Hash-Chain: prevHash verweist auf den Hash des Vorgänger-Eintrags.
+  // hash = SHA-256(prevHash || canonicalJSON(entry)). Beide werden vom
+  // Appender-Service gesetzt; Trigger blockieren UPDATE/DELETE.
+  prevHash: text("prev_hash"),
+  hash: text("hash"),
 });
 
 // ─── Users ────────────────────────────────────────────────────────────────────

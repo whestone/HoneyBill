@@ -39,7 +39,13 @@ export async function documentRoutes(app: FastifyInstance) {
     if (q.type) conditions.push(eq(documents.documentType, q.type));
     if (q.status) conditions.push(eq(documents.status, q.status));
     if (q.customer) conditions.push(eq(documents.customerId, Number(q.customer)));
-    if (q.q) conditions.push(sql`${documents.documentNumber} LIKE ${"%" + q.q + "%"}`);
+    if (q.q) {
+      // LIKE-Wildcards (% _) escapen + Eingabe auf 100 Zeichen begrenzen, um
+      // Performance-Angriffe und versehentliches Ausufern der Treffermenge zu verhindern.
+      const raw = String(q.q).slice(0, 100);
+      const escaped = raw.replace(/[\\%_]/g, (c) => `\\${c}`);
+      conditions.push(sql`${documents.documentNumber} LIKE ${"%" + escaped + "%"} ESCAPE '\\'`);
+    }
 
     const [total, rows] = await Promise.all([
       db
