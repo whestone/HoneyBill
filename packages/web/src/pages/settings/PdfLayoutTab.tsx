@@ -9,6 +9,7 @@ import { useEffect, useState, useMemo } from "react";
 import { CheckCircle, FileText } from "lucide-react";
 import { usePDF } from "@react-pdf/renderer";
 import { InvoicePDF } from "@/components/pdf/InvoiceTemplate";
+import { useCan } from "@/api/hooks/usePermissions";
 
 // ─── Mock document for PDF preview ───────────────────────────────────────────
 
@@ -90,6 +91,8 @@ const TOTAL_DISPLAY_OPTIONS: { value: string; label: string }[] = [
 
 export function PdfLayoutTab() {
   const qc = useQueryClient();
+  const { can } = useCan();
+  const canEdit = can("settings.pdfLayout", "edit");
   const [saved, setSaved] = useState(false);
   const [previewType, setPreviewType] = useState<DocumentType>("INVOICE");
 
@@ -160,7 +163,7 @@ export function PdfLayoutTab() {
     <div className="grid grid-cols-[400px_1fr] gap-6 items-start">
       {/* Controls */}
       <div className="space-y-4">
-        {/* Document type tabs */}
+        {/* Document type tabs — immer klickbar (nur Vorschau-Auswahl, kein Edit) */}
         <div className="flex gap-1 rounded-lg bg-gray-100 p-1">
           {DOC_TYPES.map((dt) => (
             <button
@@ -176,6 +179,7 @@ export function PdfLayoutTab() {
           ))}
         </div>
 
+        <fieldset disabled={!canEdit} className="space-y-4 disabled:opacity-60">
         {/* Layout settings per doc type */}
         <div className="card p-5 space-y-4">
           <h2 className="font-semibold text-gray-900 text-sm">
@@ -317,6 +321,7 @@ export function PdfLayoutTab() {
             </span>
           )}
         </div>
+        </fieldset>
       </div>
 
       {/* Preview */}

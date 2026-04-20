@@ -7,9 +7,12 @@ import {
 } from "@honeybill/shared";
 import { useEffect, useState } from "react";
 import { CheckCircle, Mail, Send, Eye, EyeOff } from "lucide-react";
+import { useCan } from "@/api/hooks/usePermissions";
 
 export function EmailTab() {
   const qc = useQueryClient();
+  const { can } = useCan();
+  const canEdit = can("settings.email", "edit");
   const [saved, setSaved] = useState(false);
   const [testEmail, setTestEmail] = useState("");
   const [testResult, setTestResult] = useState<{ ok: boolean; message?: string } | null>(null);
@@ -70,7 +73,7 @@ export function EmailTab() {
   if (isLoading) return <div className="py-8 text-center text-gray-400">Laden…</div>;
 
   return (
-    <div className="space-y-4">
+    <fieldset disabled={!canEdit} className="space-y-4 disabled:opacity-60">
       {/* Provider selection */}
       <div className="card p-5 space-y-4">
         <h2 className="font-semibold text-gray-900 flex items-center gap-2">
@@ -225,6 +228,6 @@ export function EmailTab() {
         {saved && <span className="flex items-center gap-1 text-green-600 text-sm"><CheckCircle size={14} /> Gespeichert</span>}
         {saveEmail.isError && <span className="text-red-600 text-sm">{(saveEmail.error as Error)?.message}</span>}
       </div>
-    </div>
+    </fieldset>
   );
 }

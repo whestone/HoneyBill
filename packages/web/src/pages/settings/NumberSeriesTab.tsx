@@ -3,6 +3,7 @@ import { api } from "@/api/client";
 import type { NumberSeries } from "@honeybill/shared";
 import { useState } from "react";
 import { CheckCircle, Hash } from "lucide-react";
+import { useCan } from "@/api/hooks/usePermissions";
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   INVOICE: "Rechnung",
@@ -22,6 +23,8 @@ const FORMAT_VARS = [
 
 export function NumberSeriesTab() {
   const qc = useQueryClient();
+  const { can } = useCan();
+  const canEdit = can("settings.numbering", "edit");
   const { data: series = [], isLoading } = useQuery<NumberSeries[]>({
     queryKey: ["number-series"],
     queryFn: () => api.get("/number-series"),
@@ -37,7 +40,7 @@ export function NumberSeriesTab() {
       ) : (
         <div className="space-y-4">
           {series.map((s) => (
-            <NumberSeriesCard key={s.documentType} series={s} onSaved={() => qc.invalidateQueries({ queryKey: ["number-series"] })} />
+            <NumberSeriesCard key={s.documentType} series={s} canEdit={canEdit} onSaved={() => qc.invalidateQueries({ queryKey: ["number-series"] })} />
           ))}
         </div>
       )}
@@ -57,7 +60,7 @@ export function NumberSeriesTab() {
   );
 }
 
-function NumberSeriesCard({ series, onSaved }: { series: NumberSeries; onSaved: () => void }) {
+function NumberSeriesCard({ series, canEdit, onSaved }: { series: NumberSeries; canEdit: boolean; onSaved: () => void }) {
   const defaultFormat = (() => {
     if (series.format) return series.format;
     const padStr = "N".repeat(series.padding || 5);
@@ -123,7 +126,7 @@ function NumberSeriesCard({ series, onSaved }: { series: NumberSeries; onSaved: 
         <Hash size={16} className="text-honey-500" />
         <h3 className="font-semibold text-gray-900">{DOC_TYPE_LABELS[series.documentType] ?? series.documentType}</h3>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <fieldset disabled={!canEdit} className="grid grid-cols-2 gap-4 disabled:opacity-60">
         <div className="col-span-2">
           <label className="label">Format</label>
           <input
@@ -167,10 +170,14 @@ function NumberSeriesCard({ series, onSaved }: { series: NumberSeries; onSaved: 
             {resetPeriod === "yearly" && "Tipp: {YYYY} im Format verwenden, damit Nummern pro Jahr eindeutig bleiben."}
           </p>
         </div>
-      </div>
+      </fieldset>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex items-center gap-3">
-        <button onClick={handleSave} disabled={saving || !hasNPlaceholder} className="btn-primary">
+        <button
+          onClick={handleSave}
+          disabled={saving || !hasNPlaceholder || !canEdit}
+          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           {saving ? "Speichern…" : "Speichern"}
         </button>
         {saved && <span className="flex items-center gap-1 text-green-600 text-sm"><CheckCircle size={14} /> Gespeichert</span>}

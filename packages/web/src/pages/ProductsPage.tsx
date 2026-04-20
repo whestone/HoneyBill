@@ -9,6 +9,7 @@ import { formatEur } from "@honeybill/shared";
 import { DecimalInput } from "@/components/ui/DecimalInput";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
+import { useCan } from "@/api/hooks/usePermissions";
 
 interface Product {
   id: number;
@@ -36,6 +37,8 @@ export function ProductsPage() {
   const { data, isLoading } = useProducts({ page: String(page) });
   const deleteProduct = useDeleteProduct();
   const confirm = useConfirm();
+  const { can } = useCan();
+  const canEdit = can("products", "edit");
 
   const handleDelete = async (p: Product) => {
     if (!await confirm(`Produkt "${p.name}" wirklich löschen?`, { title: "Produkt löschen" })) return;
@@ -46,7 +49,12 @@ export function ProductsPage() {
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Produkte</h1>
-        <button onClick={() => setShowCreate(true)} className="btn-primary">
+        <button
+          onClick={() => setShowCreate(true)}
+          disabled={!canEdit}
+          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          title={canEdit ? undefined : "Keine Schreibrechte"}
+        >
           <Plus size={16} /> Neues Produkt
         </button>
       </div>
@@ -88,15 +96,17 @@ export function ProductsPage() {
                     <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => setEditProduct(p as Product)}
-                        className="p-1 text-gray-400 hover:text-honey-600 rounded"
-                        title="Bearbeiten"
+                        disabled={!canEdit}
+                        className="p-1 text-gray-400 hover:text-honey-600 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={canEdit ? "Bearbeiten" : "Keine Schreibrechte"}
                       >
                         <Pencil size={14} />
                       </button>
                       <button
                         onClick={() => handleDelete(p as Product)}
-                        className="p-1 text-gray-400 hover:text-red-600 rounded"
-                        title="Löschen"
+                        disabled={!canEdit}
+                        className="p-1 text-gray-400 hover:text-red-600 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={canEdit ? "Löschen" : "Keine Schreibrechte"}
                       >
                         <Trash2 size={14} />
                       </button>

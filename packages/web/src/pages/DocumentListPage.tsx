@@ -9,6 +9,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
 import { formatEur, DOCUMENT_TYPE_LABELS } from "@honeybill/shared";
 import type { DocumentType } from "@honeybill/shared";
+import { useCan } from "@/api/hooks/usePermissions";
 
 const TYPES: DocumentType[] = ["INVOICE", "QUOTE", "CREDIT_NOTE", "DELIVERY_NOTE"];
 
@@ -27,12 +28,19 @@ export function DocumentListPage() {
 
   const { data, isLoading } = useDocuments(params);
   const deleteDoc = useDeleteDocument();
+  const { can } = useCan();
+  const canEdit = can("documents", "edit");
 
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Belege</h1>
-        <button onClick={() => setShowCreate(true)} className="btn-primary">
+        <button
+          onClick={() => setShowCreate(true)}
+          disabled={!canEdit}
+          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          title={canEdit ? undefined : "Keine Schreibrechte"}
+        >
           <Plus size={16} /> Neuer Beleg
         </button>
       </div>
@@ -83,7 +91,11 @@ export function DocumentListPage() {
             title="Keine Belege gefunden"
             description="Erstelle deinen ersten Beleg."
             action={
-              <button onClick={() => setShowCreate(true)} className="btn-primary">
+              <button
+                onClick={() => setShowCreate(true)}
+                disabled={!canEdit}
+                className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 <Plus size={14} /> Neuer Beleg
               </button>
             }

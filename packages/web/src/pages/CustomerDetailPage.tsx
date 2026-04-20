@@ -8,11 +8,14 @@ import { CreateCustomerSchema, type CreateCustomerInput, formatEur, DOCUMENT_TYP
 import { ArrowLeft, Building2, CheckCircle, FileText, User } from "lucide-react";
 import { StatusBadge, TypeBadge } from "@/components/ui/Badge";
 import type { DocumentType } from "@honeybill/shared";
+import { useCan } from "@/api/hooks/usePermissions";
 
 export function CustomerDetailPage() {
   const { id } = useParams({ strict: false });
   const navigate = useNavigate();
   const customerId = Number(id);
+  const { can } = useCan();
+  const canEdit = can("customers", "edit");
 
   const { data: customer, isLoading } = useCustomer(customerId);
   const update = useUpdateCustomer(customerId);
@@ -137,6 +140,7 @@ export function CustomerDetailPage() {
       {/* Details tab */}
       {tab === "details" && (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <fieldset disabled={!canEdit} className="space-y-5 disabled:opacity-60">
           <div className="card p-5 space-y-4">
             <h2 className="font-semibold text-gray-900">Allgemein</h2>
             <div className="grid grid-cols-2 gap-4">
@@ -262,6 +266,7 @@ export function CustomerDetailPage() {
               </span>
             )}
           </div>
+          </fieldset>
         </form>
       )}
 

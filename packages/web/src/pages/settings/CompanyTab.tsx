@@ -6,10 +6,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { UpdateCompanySettingsSchema, type UpdateCompanySettingsInput } from "@honeybill/shared";
 import { useEffect, useRef, useState } from "react";
 import { Building2, CheckCircle } from "lucide-react";
+import { useCan } from "@/api/hooks/usePermissions";
 
 export function CompanyTab() {
   const [saved, setSaved] = useState(false);
   const qc = useQueryClient();
+  const { can } = useCan();
+  const canEdit = can("settings.company", "edit");
 
   const { data: company, isLoading } = useQuery<CompanySettings>({
     queryKey: ["company-settings"],
@@ -65,7 +68,11 @@ export function CompanyTab() {
             </div>
           )}
           <div>
-            <button onClick={() => logoRef.current?.click()} className="btn-secondary text-xs">
+            <button
+              onClick={() => logoRef.current?.click()}
+              disabled={!canEdit}
+              className="btn-secondary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               Logo hochladen
             </button>
             <input ref={logoRef} type="file" accept="image/*" hidden onChange={handleLogoChange} />
@@ -77,6 +84,7 @@ export function CompanyTab() {
       {/* Company form */}
       <form onSubmit={handleSubmit((data) => updateCompany.mutate(data))} className="card p-6 space-y-4">
         <h2 className="font-semibold text-gray-900">Firmendaten</h2>
+        <fieldset disabled={!canEdit} className="space-y-4 disabled:opacity-60">
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
             <label className="label">Firmenname *</label>
@@ -159,6 +167,7 @@ export function CompanyTab() {
             </span>
           )}
         </div>
+        </fieldset>
       </form>
     </div>
   );

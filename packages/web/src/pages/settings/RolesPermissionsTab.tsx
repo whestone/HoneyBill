@@ -89,18 +89,31 @@ export function RolesPermissionsTab() {
           <thead>
             <tr className="border-b border-gray-200">
               <th className="text-left py-2 pr-4 font-medium text-gray-700">Bereich</th>
-              {CONFIGURABLE_ROLES.map((role) => (
-                <th key={role} className="text-center py-2 px-2 font-medium text-gray-700" colSpan={2}>
+              {CONFIGURABLE_ROLES.map((role, idx) => (
+                <th
+                  key={role}
+                  className={`text-center py-2 font-medium text-gray-700 pr-4 ${
+                    idx > 0 ? "pl-8" : "pl-4"
+                  }`}
+                  colSpan={2}
+                >
                   {ROLE_LABELS[role]}
                 </th>
               ))}
             </tr>
             <tr className="border-b border-gray-100 text-xs text-gray-500">
               <th></th>
-              {CONFIGURABLE_ROLES.map((role) => (
+              {CONFIGURABLE_ROLES.map((role, idx) => (
                 <>
-                  <th key={`${role}-v`} className="text-center py-1 font-normal">View</th>
-                  <th key={`${role}-e`} className="text-center py-1 font-normal">Edit</th>
+                  <th
+                    key={`${role}-v`}
+                    className={`text-center py-1 font-normal ${idx > 0 ? "pl-8" : "pl-4"}`}
+                  >
+                    View
+                  </th>
+                  <th key={`${role}-e`} className="text-center py-1 font-normal pr-4">
+                    Edit
+                  </th>
                 </>
               ))}
             </tr>
@@ -109,11 +122,14 @@ export function RolesPermissionsTab() {
             {PERMISSION_RESOURCES.map((resource) => (
               <tr key={resource} className="border-b border-gray-50 hover:bg-gray-50">
                 <td className="py-2 pr-4 text-gray-800">{PERMISSION_RESOURCE_LABELS[resource]}</td>
-                {CONFIGURABLE_ROLES.map((role) => {
+                {CONFIGURABLE_ROLES.map((role, idx) => {
                   const entry = matrix[role]?.[resource] ?? { canView: false, canEdit: false };
                   return (
                     <>
-                      <td key={`${role}-${resource}-v`} className="text-center py-2">
+                      <td
+                        key={`${role}-${resource}-v`}
+                        className={`text-center py-2 ${idx > 0 ? "pl-8" : "pl-4"}`}
+                      >
                         <input
                           type="checkbox"
                           className="w-4 h-4 rounded border-gray-300 text-honey-600 focus:ring-honey-500"
@@ -121,7 +137,7 @@ export function RolesPermissionsTab() {
                           onChange={() => toggle(role, resource, "canView")}
                         />
                       </td>
-                      <td key={`${role}-${resource}-e`} className="text-center py-2">
+                      <td key={`${role}-${resource}-e`} className="text-center py-2 pr-4">
                         <input
                           type="checkbox"
                           className="w-4 h-4 rounded border-gray-300 text-honey-600 focus:ring-honey-500"

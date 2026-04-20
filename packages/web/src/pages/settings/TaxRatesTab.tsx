@@ -6,6 +6,7 @@ import { Plus, Trash2, FileText, History } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
 import { DecimalInput } from "@/components/ui/DecimalInput";
+import { useCan } from "@/api/hooks/usePermissions";
 
 const TAX_CATEGORIES = [
   { value: "S", label: "S – Normalsatz" },
@@ -18,6 +19,8 @@ const TAX_CATEGORIES = [
 export function TaxRatesTab() {
   const qc = useQueryClient();
   const confirm = useConfirm();
+  const { can } = useCan();
+  const canEdit = can("settings.taxRates", "edit");
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<TaxRate | null>(null);
 
@@ -52,7 +55,11 @@ export function TaxRatesTab() {
             />
             Abgelaufene anzeigen
           </label>
-          <button onClick={() => setShowCreate(true)} className="btn-primary">
+          <button
+            onClick={() => setShowCreate(true)}
+            disabled={!canEdit}
+            className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <Plus size={14} /> Neuer Steuersatz
           </button>
         </div>
@@ -98,20 +105,21 @@ export function TaxRatesTab() {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => setEditing(tr)}
-                        className="text-gray-300 hover:text-honey-600 transition-colors p-1"
-                        title="Bearbeiten"
+                        disabled={!canEdit}
+                        className="text-gray-300 hover:text-honey-600 transition-colors p-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                        title={canEdit ? "Bearbeiten" : "Keine Schreibrechte"}
                       >
                         <FileText size={14} />
                       </button>
                       <button
                         onClick={async () => { if (await confirm(`Steuersatz "${tr.name}" löschen?`, { title: "Steuersatz löschen", confirmLabel: "Löschen" })) deleteTaxRate.mutate(tr.id); }}
-                        disabled={!!deleteBlockedReason}
+                        disabled={!!deleteBlockedReason || !canEdit}
                         className={
-                          deleteBlockedReason
+                          deleteBlockedReason || !canEdit
                             ? "text-gray-200 cursor-not-allowed p-1"
                             : "text-gray-300 hover:text-red-500 transition-colors p-1"
                         }
-                        title={deleteBlockedReason ?? "Löschen"}
+                        title={!canEdit ? "Keine Schreibrechte" : (deleteBlockedReason ?? "Löschen")}
                       >
                         <Trash2 size={14} />
                       </button>

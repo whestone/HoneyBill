@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Plus, Search, Users } from "lucide-react";
-import { useCustomers, useCreateCustomer, useDeleteCustomer } from "@/api/hooks/useCustomers";
+import { useCustomers, useCreateCustomer } from "@/api/hooks/useCustomers";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateCustomerSchema, type CreateCustomerInput } from "@honeybill/shared";
+import { useCan } from "@/api/hooks/usePermissions";
 
 const EUR_FMT = new Intl.NumberFormat("de-DE", {
   style: "currency",
@@ -23,15 +24,21 @@ export function CustomersPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
+  const { can } = useCan();
+  const canEdit = can("customers", "edit");
 
   const { data, isLoading } = useCustomers({ q: search, page: String(page) });
-  const deleteCustomer = useDeleteCustomer();
 
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Kunden</h1>
-        <button onClick={() => setShowCreate(true)} className="btn-primary">
+        <button
+          onClick={() => setShowCreate(true)}
+          disabled={!canEdit}
+          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          title={canEdit ? undefined : "Keine Schreibrechte"}
+        >
           <Plus size={16} /> Neuer Kunde
         </button>
       </div>
@@ -57,7 +64,11 @@ export function CustomersPage() {
             title="Keine Kunden gefunden"
             description="Erstelle deinen ersten Kunden, um loszulegen."
             action={
-              <button onClick={() => setShowCreate(true)} className="btn-primary">
+              <button
+                onClick={() => setShowCreate(true)}
+                disabled={!canEdit}
+                className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 <Plus size={14} /> Neuer Kunde
               </button>
             }
