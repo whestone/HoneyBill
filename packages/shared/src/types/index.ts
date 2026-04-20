@@ -465,6 +465,11 @@ export interface User {
   lastLoginAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Nur am /auth/me-Endpoint gesetzt: Rechte-Matrix der Rolle des eingeloggten Users.
+   * Schluessel sind PermissionResource-Strings (documents, customers, settings.*, ...).
+   */
+  permissions?: Record<string, { canView: boolean; canEdit: boolean }>;
 }
 
 export interface AuditLogEntry {

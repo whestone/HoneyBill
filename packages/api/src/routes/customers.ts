@@ -126,7 +126,7 @@ export async function customerRoutes(app: FastifyInstance) {
   });
 
   // POST /api/v1/customers
-  app.post("/", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post("/", { onRequest: [app.authenticate], preHandler: [app.requirePermission("customers", "edit")] }, async (req, reply) => {
     const input = CreateCustomerSchema.parse(req.body);
 
     // Auto-generate customer number if not provided
@@ -153,7 +153,7 @@ export async function customerRoutes(app: FastifyInstance) {
   });
 
   // PUT /api/v1/customers/:id
-  app.put("/:id", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.put("/:id", { onRequest: [app.authenticate], preHandler: [app.requirePermission("customers", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const input = UpdateCustomerSchema.parse(req.body);
     const [row] = await db
@@ -166,7 +166,7 @@ export async function customerRoutes(app: FastifyInstance) {
   });
 
   // DELETE /api/v1/customers/:id (soft delete)
-  app.delete("/:id", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.delete("/:id", { onRequest: [app.authenticate], preHandler: [app.requirePermission("customers", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     await db
       .update(customers)

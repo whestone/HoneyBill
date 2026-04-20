@@ -110,7 +110,7 @@ export async function documentRoutes(app: FastifyInstance) {
   });
 
   // POST /api/v1/documents
-  app.post("/", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post("/", { onRequest: [app.authenticate], preHandler: [app.requirePermission("documents", "edit")] }, async (req, reply) => {
     const input = CreateDocumentSchema.parse(req.body);
     const payload = req.user as { sub: string };
     const doc = await createDocument(db, input, Number(payload.sub));
@@ -135,7 +135,7 @@ export async function documentRoutes(app: FastifyInstance) {
   });
 
   // PUT /api/v1/documents/:id
-  app.put("/:id", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.put("/:id", { onRequest: [app.authenticate], preHandler: [app.requirePermission("documents", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const input = UpdateDocumentSchema.parse(req.body);
     const doc = await updateDocument(db, Number(id), input);
@@ -143,7 +143,7 @@ export async function documentRoutes(app: FastifyInstance) {
   });
 
   // DELETE /api/v1/documents/:id (DRAFT only)
-  app.delete("/:id", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.delete("/:id", { onRequest: [app.authenticate], preHandler: [app.requirePermission("documents", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const doc = await db.query.documents.findFirst({ where: eq(documents.id, Number(id)) });
     if (!doc) return reply.status(404).send({ message: "Beleg nicht gefunden" });
@@ -153,7 +153,7 @@ export async function documentRoutes(app: FastifyInstance) {
   });
 
   // POST /api/v1/documents/:id/finalize
-  app.post("/:id/finalize", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post("/:id/finalize", { onRequest: [app.authenticate], preHandler: [app.requirePermission("documents", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const payload = req.user as { sub: string };
     const doc = await finalizeDocument(db, Number(id), Number(payload.sub));
@@ -161,7 +161,7 @@ export async function documentRoutes(app: FastifyInstance) {
   });
 
   // POST /api/v1/documents/:id/send
-  app.post("/:id/send", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post("/:id/send", { onRequest: [app.authenticate], preHandler: [app.requirePermission("documents", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const doc = await db.query.documents.findFirst({ where: eq(documents.id, Number(id)) });
     if (!doc) return reply.status(404).send({ message: "Beleg nicht gefunden" });
@@ -174,7 +174,7 @@ export async function documentRoutes(app: FastifyInstance) {
   });
 
   // PATCH /api/v1/documents/:id/notes — update internalNotes regardless of status
-  app.patch("/:id/notes", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.patch("/:id/notes", { onRequest: [app.authenticate], preHandler: [app.requirePermission("documents", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const { internalNotes } = req.body as { internalNotes: string | null };
     const doc = await db.query.documents.findFirst({ where: eq(documents.id, Number(id)) });
@@ -189,7 +189,7 @@ export async function documentRoutes(app: FastifyInstance) {
   // POST /api/v1/documents/:id/cancel
   // Cancels a finalized document by creating an auto-finalized counter-document with negated amounts:
   // INVOICE → CREDIT_NOTE (negative), CREDIT_NOTE → INVOICE (double-negation = positive)
-  app.post("/:id/cancel", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post("/:id/cancel", { onRequest: [app.authenticate], preHandler: [app.requirePermission("documents", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const userId = Number((req.user as { sub: string }).sub);
 
@@ -247,7 +247,7 @@ export async function documentRoutes(app: FastifyInstance) {
   });
 
   // POST /api/v1/documents/:id/convert-to-invoice
-  app.post("/:id/convert-to-invoice", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post("/:id/convert-to-invoice", { onRequest: [app.authenticate], preHandler: [app.requirePermission("documents", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const payload = req.user as { sub: string };
     const source = await db.query.documents.findFirst({
@@ -293,7 +293,7 @@ export async function documentRoutes(app: FastifyInstance) {
   });
 
   // POST /api/v1/documents/:id/create-credit-note
-  app.post("/:id/create-credit-note", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post("/:id/create-credit-note", { onRequest: [app.authenticate], preHandler: [app.requirePermission("documents", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const payload = req.user as { sub: string };
     const source = await db.query.documents.findFirst({
@@ -334,7 +334,7 @@ export async function documentRoutes(app: FastifyInstance) {
   });
 
   // POST /api/v1/documents/:id/create-delivery-note
-  app.post("/:id/create-delivery-note", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post("/:id/create-delivery-note", { onRequest: [app.authenticate], preHandler: [app.requirePermission("documents", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const payload = req.user as { sub: string };
     const source = await db.query.documents.findFirst({
@@ -434,7 +434,7 @@ export async function documentRoutes(app: FastifyInstance) {
   });
 
   // POST /api/v1/documents/:id/payments
-  app.post("/:id/payments", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post("/:id/payments", { onRequest: [app.authenticate], preHandler: [app.requirePermission("openItems", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const input = CreatePaymentSchema.parse(req.body);
     const payload = req.user as { sub: string };
@@ -443,7 +443,7 @@ export async function documentRoutes(app: FastifyInstance) {
   });
 
   // DELETE /api/v1/documents/:id/payments/:paymentId
-  app.delete("/:id/payments/:paymentId", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.delete("/:id/payments/:paymentId", { onRequest: [app.authenticate], preHandler: [app.requirePermission("openItems", "edit")] }, async (req, reply) => {
     const { id, paymentId } = req.params as { id: string; paymentId: string };
     const doc = await db.query.documents.findFirst({ where: eq(documents.id, Number(id)) });
     if (!doc) return reply.status(404).send({ message: "Beleg nicht gefunden" });
@@ -484,7 +484,7 @@ export async function documentRoutes(app: FastifyInstance) {
 
   // GET /api/v1/documents/:id/zugferd-pdf
   // Expects a PDF to be POSTed as multipart, packages it as ZUGFeRD PDF/A-3
-  app.post("/:id/zugferd-pdf", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post("/:id/zugferd-pdf", { onRequest: [app.authenticate], preHandler: [app.requirePermission("documents", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const doc = await getFullDocument(Number(id));
     if (!doc) return reply.status(404).send({ message: "Beleg nicht gefunden" });

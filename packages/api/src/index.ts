@@ -8,7 +8,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
 import { authenticatePlugin } from "./middleware/authenticate.js";
+import { requirePermissionPlugin } from "./middleware/requirePermission.js";
 import { authRoutes } from "./routes/auth.js";
+import { permissionRoutes } from "./routes/permissions.js";
 import { customerRoutes } from "./routes/customers.js";
 import { productRoutes, productCategoryRoutes } from "./routes/products.js";
 import { documentRoutes } from "./routes/documents.js";
@@ -61,6 +63,7 @@ await app.register(staticFiles, {
 });
 
 await app.register(authenticatePlugin);
+await app.register(requirePermissionPlugin);
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
@@ -75,6 +78,7 @@ await app.register(numberSeriesRoutes, { prefix: "/api/v1/number-series" });
 await app.register(openItemsRoutes, { prefix: "/api/v1/open-items" });
 await app.register(auditLogRoutes, { prefix: "/api/v1/audit-log" });
 await app.register(userRoutes, { prefix: "/api/v1/users" });
+await app.register(permissionRoutes, { prefix: "/api/v1/permissions" });
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
 

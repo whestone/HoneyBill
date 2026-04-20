@@ -32,7 +32,7 @@ export async function productRoutes(app: FastifyInstance) {
   });
 
   // POST /api/v1/products
-  app.post("/", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post("/", { onRequest: [app.authenticate], preHandler: [app.requirePermission("products", "edit")] }, async (req, reply) => {
     const input = CreateProductSchema.parse(req.body);
     const [row] = await db.insert(products).values(input).returning();
     if (!row) throw new Error("Produkt konnte nicht erstellt werden");
@@ -57,7 +57,7 @@ export async function productRoutes(app: FastifyInstance) {
   });
 
   // PUT /api/v1/products/:id
-  app.put("/:id", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.put("/:id", { onRequest: [app.authenticate], preHandler: [app.requirePermission("products", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const input = UpdateProductSchema.parse(req.body);
     const [row] = await db
@@ -70,7 +70,7 @@ export async function productRoutes(app: FastifyInstance) {
   });
 
   // DELETE /api/v1/products/:id (soft)
-  app.delete("/:id", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.delete("/:id", { onRequest: [app.authenticate], preHandler: [app.requirePermission("products", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     await db
       .update(products)
@@ -89,7 +89,7 @@ export async function productRoutes(app: FastifyInstance) {
   });
 
   // POST /api/v1/products/:id/price-history/successor — neue Preisperiode
-  app.post("/:id/price-history/successor", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post("/:id/price-history/successor", { onRequest: [app.authenticate], preHandler: [app.requirePermission("products", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const body = req.body as { unitPrice: string; validFrom: string };
     const today = new Date().toISOString().slice(0, 10);
@@ -133,7 +133,7 @@ export async function productRoutes(app: FastifyInstance) {
   });
 
   // DELETE /api/v1/products/price-history/:hid
-  app.delete("/price-history/:hid", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.delete("/price-history/:hid", { onRequest: [app.authenticate], preHandler: [app.requirePermission("products", "edit")] }, async (req, reply) => {
     const { hid } = req.params as { hid: string };
     await db.delete(productPriceHistory).where(eq(productPriceHistory.id, Number(hid)));
     return reply.status(204).send();
@@ -146,13 +146,13 @@ export async function productCategoryRoutes(app: FastifyInstance) {
     return reply.send(rows);
   });
 
-  app.post("/", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post("/", { onRequest: [app.authenticate], preHandler: [app.requirePermission("products", "edit")] }, async (req, reply) => {
     const { name } = req.body as { name: string };
     const [row] = await db.insert(productCategories).values({ name }).returning();
     return reply.status(201).send(row);
   });
 
-  app.put("/:id", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.put("/:id", { onRequest: [app.authenticate], preHandler: [app.requirePermission("products", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const { name } = req.body as { name: string };
     const [row] = await db
@@ -164,7 +164,7 @@ export async function productCategoryRoutes(app: FastifyInstance) {
     return reply.send(row);
   });
 
-  app.delete("/:id", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.delete("/:id", { onRequest: [app.authenticate], preHandler: [app.requirePermission("products", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     await db.delete(productCategories).where(eq(productCategories.id, Number(id)));
     return reply.status(204).send();

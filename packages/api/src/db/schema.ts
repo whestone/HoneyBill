@@ -1,5 +1,19 @@
-import { int, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { int, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { relations, sql } from "drizzle-orm";
+
+// ─── Role Permissions ─────────────────────────────────────────────────────────
+
+export const rolePermissions = sqliteTable(
+  "role_permissions",
+  {
+    role: text("role").notNull(),
+    resource: text("resource").notNull(),
+    canView: int("can_view", { mode: "boolean" }).notNull().default(false),
+    canEdit: int("can_edit", { mode: "boolean" }).notNull().default(false),
+    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.role, t.resource] }) }),
+);
 
 // ─── Company Settings ─────────────────────────────────────────────────────────
 

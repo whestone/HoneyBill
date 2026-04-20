@@ -33,7 +33,7 @@ export async function settingsRoutes(app: FastifyInstance) {
   });
 
   // PUT /api/v1/settings/company
-  app.put("/company", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.put("/company", { onRequest: [app.authenticate], preHandler: [app.requirePermission("settings.company", "edit")] }, async (req, reply) => {
     const input = UpdateCompanySettingsSchema.parse(req.body);
     const existing = await db.select().from(companySettings).limit(1);
     if (existing.length === 0) {
@@ -49,7 +49,7 @@ export async function settingsRoutes(app: FastifyInstance) {
   });
 
   // PUT /api/v1/settings/company/pdf
-  app.put("/company/pdf", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.put("/company/pdf", { onRequest: [app.authenticate], preHandler: [app.requirePermission("settings.pdfLayout", "edit")] }, async (req, reply) => {
     const input = UpdatePdfSettingsSchema.parse(req.body);
     const existing = await db.select().from(companySettings).limit(1);
     const json = JSON.stringify(input);
@@ -66,7 +66,7 @@ export async function settingsRoutes(app: FastifyInstance) {
   });
 
   // PUT /api/v1/settings/company/email
-  app.put("/company/email", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.put("/company/email", { onRequest: [app.authenticate], preHandler: [app.requirePermission("settings.email", "edit")] }, async (req, reply) => {
     const input = UpdateEmailSettingsSchema.parse(req.body);
     const existing = await db.select().from(companySettings).limit(1);
     const json = JSON.stringify(input);
@@ -83,7 +83,7 @@ export async function settingsRoutes(app: FastifyInstance) {
   });
 
   // POST /api/v1/settings/company/email/test
-  app.post("/company/email/test", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post("/company/email/test", { onRequest: [app.authenticate], preHandler: [app.requirePermission("settings.email", "edit")] }, async (req, reply) => {
     const body = req.body as { to: string };
     const [row] = await db.select().from(companySettings).limit(1);
     const emailSettings: EmailSettings | null = row?.emailSettings ? JSON.parse(row.emailSettings) : null;
@@ -108,7 +108,7 @@ export async function settingsRoutes(app: FastifyInstance) {
   });
 
   // POST /api/v1/settings/company/email/send-document (multipart: to, subject, body, pdf?)
-  app.post("/company/email/send-document", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post("/company/email/send-document", { onRequest: [app.authenticate], preHandler: [app.requirePermission("documents", "edit")] }, async (req, reply) => {
     const parts = (req as any).parts();
     const fields: Record<string, string> = {};
     let pdfBuffer: Buffer | null = null;
@@ -191,7 +191,7 @@ export async function settingsRoutes(app: FastifyInstance) {
   });
 
   // POST /api/v1/settings/company/logo (multipart)
-  app.post("/company/logo", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post("/company/logo", { onRequest: [app.authenticate], preHandler: [app.requirePermission("settings.pdfLayout", "edit")] }, async (req, reply) => {
     const data = await (req as any).file();
     const logoDir = path.join(config.uploadsDir, "logos");
     fs.mkdirSync(logoDir, { recursive: true });
@@ -255,7 +255,7 @@ export async function taxRateRoutes(app: FastifyInstance) {
   });
 
   // POST /api/v1/tax-rates
-  app.post("/", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post("/", { onRequest: [app.authenticate], preHandler: [app.requirePermission("settings.taxRates", "edit")] }, async (req, reply) => {
     const body = req.body as {
       name: string; ratePercent: string; taxCategory?: string; validFrom: string; isDefault?: boolean;
     };
@@ -273,7 +273,7 @@ export async function taxRateRoutes(app: FastifyInstance) {
   });
 
   // POST /api/v1/tax-rates/:id/successor — neue Periode für bestehenden Satz
-  app.post("/:id/successor", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post("/:id/successor", { onRequest: [app.authenticate], preHandler: [app.requirePermission("settings.taxRates", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const body = req.body as { ratePercent: string; validFrom: string };
 
@@ -318,7 +318,7 @@ export async function taxRateRoutes(app: FastifyInstance) {
   });
 
   // PUT /api/v1/tax-rates/:id — nur Metadaten, nie validTo/validFrom/ratePercent
-  app.put("/:id", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.put("/:id", { onRequest: [app.authenticate], preHandler: [app.requirePermission("settings.taxRates", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const body = req.body as Partial<typeof taxRates.$inferInsert>;
     const { validTo: _vt, validFrom: _vf, ratePercent: _rp, ...meta } = body as any;
@@ -335,7 +335,7 @@ export async function taxRateRoutes(app: FastifyInstance) {
   });
 
   // DELETE /api/v1/tax-rates/:id
-  app.delete("/:id", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.delete("/:id", { onRequest: [app.authenticate], preHandler: [app.requirePermission("settings.taxRates", "edit")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const taxRateId = Number(id);
 
@@ -372,7 +372,7 @@ export async function numberSeriesRoutes(app: FastifyInstance) {
   });
 
   // PUT /api/v1/number-series/:documentType
-  app.put("/:documentType", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.put("/:documentType", { onRequest: [app.authenticate], preHandler: [app.requirePermission("settings.numbering", "edit")] }, async (req, reply) => {
     const { documentType } = req.params as { documentType: string };
     const input = UpdateNumberSeriesSchema.parse(req.body);
     const [row] = await db
@@ -385,7 +385,7 @@ export async function numberSeriesRoutes(app: FastifyInstance) {
   });
 
   // POST /api/v1/number-series/:documentType/preview
-  app.post("/:documentType/preview", { onRequest: [app.authenticate] }, async (req, reply) => {
+  app.post("/:documentType/preview", { onRequest: [app.authenticate], preHandler: [app.requirePermission("settings.numbering", "view")] }, async (req, reply) => {
     const { documentType } = req.params as { documentType: string };
     const body = (req.body ?? {}) as { format?: string };
     const preview = previewNextNumber(sqlite, documentType as DocumentType, body.format);

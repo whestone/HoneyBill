@@ -6,6 +6,7 @@ import { db } from "../db/index.js";
 import { sessions, users } from "../db/schema.js";
 import { z } from "zod";
 import { appendAudit } from "../services/audit.service.js";
+import { getPermissionsForRole } from "../services/permissions.service.js";
 
 const LoginSchema = z.object({
   email: z.string().min(1).max(255),
@@ -100,7 +101,8 @@ export async function authRoutes(app: FastifyInstance) {
     });
     if (!user) return reply.status(401).send({ message: "Unauthorized" });
     const { passwordHash: _ph, ...safe } = user;
-    return reply.send(safe);
+    const permissions = await getPermissionsForRole(user.role);
+    return reply.send({ ...safe, permissions });
   });
 
   // PUT /api/v1/auth/me/password
