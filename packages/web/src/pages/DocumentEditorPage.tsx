@@ -115,7 +115,6 @@ export function DocumentEditorPage() {
   const [paymentDays, setPaymentDays] = useState<string>("");
   const [internalNotes, setInternalNotes] = useState("");
   const [closingText, setClosingText] = useState("");
-  const [einvoiceProfile, setEinvoiceProfile] = useState<string>("");
   const [globalDiscountPct, setGlobalDiscountPct] = useState("0.00");
   const [globalDiscountType, setGlobalDiscountType] = useState<"pct" | "abs">("pct");
   const [layoutOverride, setLayoutOverride] = useState<Partial<DocumentLayoutSettings> | null>(null);
@@ -128,7 +127,6 @@ export function DocumentEditorPage() {
     setDeliveryDate(doc.deliveryDate ?? "");
     setPaymentDays(doc.paymentDays != null ? String(doc.paymentDays) : "");
     setInternalNotes(doc.internalNotes ?? "");
-    setEinvoiceProfile(doc.einvoiceProfile ?? "");
     setGlobalDiscountPct(doc.globalDiscountPct ?? "0.00");
     setGlobalDiscountType((doc.globalDiscountType ?? "pct") as "pct" | "abs");
     const lo = (() => {
@@ -250,7 +248,6 @@ export function DocumentEditorPage() {
         deliveryDate: deliveryDate || null,
         paymentDays: paymentDays ? Number(paymentDays) : null,
         internalNotes: internalNotes || null,
-        einvoiceProfile: einvoiceProfile || null,
         globalDiscountPct: globalDiscountPct || "0.00",
         globalDiscountType,
         layoutOverride: (layoutOverride || closingText) ? { ...layoutOverride, ...(closingText ? { closingText } : {}) } : null,
@@ -272,7 +269,7 @@ export function DocumentEditorPage() {
     } finally {
       setSaving(false);
     }
-  }, [doc, rows, deliveryDate, paymentDays, internalNotes, closingText, einvoiceProfile, globalDiscountPct, globalDiscountType, layoutOverride, qc]);
+  }, [doc, rows, deliveryDate, paymentDays, internalNotes, closingText, globalDiscountPct, globalDiscountType, layoutOverride, qc]);
 
   const handleFinalize = async () => {
     setFinalizeError(null);
@@ -393,18 +390,6 @@ export function DocumentEditorPage() {
                   value={paymentDays}
                   onChange={(e) => { setPaymentDays(e.target.value); setDirty(true); }}
                 />
-              </div>
-              <div>
-                <label className="label">E-Rechnung Profil</label>
-                <select
-                  className="input"
-                  value={einvoiceProfile}
-                  onChange={(e) => { setEinvoiceProfile(e.target.value); setDirty(true); }}
-                >
-                  <option value="">Kein E-Rechnung Export</option>
-                  <option value="ZUGFERD_EXTENDED">ZUGFeRD 2.3 EXTENDED</option>
-                  <option value="XRECHNUNG">XRechnung 3.0</option>
-                </select>
               </div>
               <div className="col-span-2 md:col-span-3">
                 <label className="label">Interne Notiz (wird nicht gedruckt)</label>

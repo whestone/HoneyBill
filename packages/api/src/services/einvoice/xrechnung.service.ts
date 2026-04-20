@@ -186,10 +186,10 @@ const CII_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
     </ram:GuidelineSpecifiedDocumentContextParameter>
   </rsm:ExchangedDocumentContext>
   <rsm:ExchangedDocument>
-    <ram:ID>{{invoiceNumber}}</ram:ID>
+    <ram:ID>{{{invoiceNumber}}}</ram:ID>
     <ram:TypeCode>380</ram:TypeCode>
     <ram:IssueDateTime>
-      <udt:DateTimeString format="102">{{issueDate}}</udt:DateTimeString>
+      <udt:DateTimeString format="102">{{{issueDate}}}</udt:DateTimeString>
     </ram:IssueDateTime>
   </rsm:ExchangedDocument>
   <rsm:SupplyChainTradeTransaction>
@@ -197,80 +197,80 @@ const CII_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
     {{#lines}}
     <ram:IncludedSupplyChainTradeLineItem>
       <ram:AssociatedDocumentLineDocument>
-        <ram:LineID>{{lineId}}</ram:LineID>
+        <ram:LineID>{{{lineId}}}</ram:LineID>
       </ram:AssociatedDocumentLineDocument>
       <ram:SpecifiedTradeProduct>
-        <ram:Name>{{description}}</ram:Name>
+        <ram:Name>{{{description}}}</ram:Name>
       </ram:SpecifiedTradeProduct>
       <ram:SpecifiedLineTradeAgreement>
         <ram:NetPriceProductTradePrice>
-          <ram:ChargeAmount>{{unitPrice}}</ram:ChargeAmount>
+          <ram:ChargeAmount>{{{unitPrice}}}</ram:ChargeAmount>
         </ram:NetPriceProductTradePrice>
       </ram:SpecifiedLineTradeAgreement>
       <ram:SpecifiedLineTradeDelivery>
-        <ram:BilledQuantity unitCode="{{unit}}">{{quantity}}</ram:BilledQuantity>
+        <ram:BilledQuantity unitCode="{{{unit}}}">{{{quantity}}}</ram:BilledQuantity>
       </ram:SpecifiedLineTradeDelivery>
       <ram:SpecifiedLineTradeSettlement>
         <ram:ApplicableTradeTax>
           <ram:TypeCode>VAT</ram:TypeCode>
-          <ram:CategoryCode>{{taxCategoryCode}}</ram:CategoryCode>
-          <ram:RateApplicablePercent>{{taxPercent}}</ram:RateApplicablePercent>
+          <ram:CategoryCode>{{{taxCategoryCode}}}</ram:CategoryCode>
+          <ram:RateApplicablePercent>{{{taxPercent}}}</ram:RateApplicablePercent>
         </ram:ApplicableTradeTax>
         <ram:SpecifiedTradeSettlementLineMonetarySummation>
-          <ram:LineTotalAmount>{{lineNet}}</ram:LineTotalAmount>
+          <ram:LineTotalAmount>{{{lineNet}}}</ram:LineTotalAmount>
         </ram:SpecifiedTradeSettlementLineMonetarySummation>
       </ram:SpecifiedLineTradeSettlement>
     </ram:IncludedSupplyChainTradeLineItem>
     {{/lines}}
     <!-- Header Trade Agreement -->
     <ram:ApplicableHeaderTradeAgreement>
-      <ram:BuyerReference>{{buyerLeitwegId}}</ram:BuyerReference>
+      <ram:BuyerReference>{{{buyerLeitwegId}}}</ram:BuyerReference>
       <ram:SellerTradeParty>
-        <ram:Name>{{sellerName}}</ram:Name>
+        <ram:Name>{{{sellerName}}}</ram:Name>
         <ram:DefinedTradeContact>
-          <ram:PersonName>{{sellerContactName}}</ram:PersonName>
+          <ram:PersonName>{{{sellerContactName}}}</ram:PersonName>
           {{#sellerPhone}}
           <ram:TelephoneUniversalCommunication>
-            <ram:CompleteNumber>{{sellerPhone}}</ram:CompleteNumber>
+            <ram:CompleteNumber>{{{sellerPhone}}}</ram:CompleteNumber>
           </ram:TelephoneUniversalCommunication>
           {{/sellerPhone}}
           {{#sellerEmail}}
           <ram:EmailURIUniversalCommunication>
-            <ram:URIID schemeID="SMTP">{{sellerEmail}}</ram:URIID>
+            <ram:URIID schemeID="SMTP">{{{sellerEmail}}}</ram:URIID>
           </ram:EmailURIUniversalCommunication>
           {{/sellerEmail}}
         </ram:DefinedTradeContact>
         <ram:PostalTradeAddress>
-          {{#sellerZip}}<ram:PostcodeCode>{{sellerZip}}</ram:PostcodeCode>{{/sellerZip}}
-          {{#sellerStreet}}<ram:LineOne>{{sellerStreet}}</ram:LineOne>{{/sellerStreet}}
-          {{#sellerCity}}<ram:CityName>{{sellerCity}}</ram:CityName>{{/sellerCity}}
-          <ram:CountryID>{{sellerCountry}}</ram:CountryID>
+          {{#sellerZip}}<ram:PostcodeCode>{{{sellerZip}}}</ram:PostcodeCode>{{/sellerZip}}
+          {{#sellerStreet}}<ram:LineOne>{{{sellerStreet}}}</ram:LineOne>{{/sellerStreet}}
+          {{#sellerCity}}<ram:CityName>{{{sellerCity}}}</ram:CityName>{{/sellerCity}}
+          <ram:CountryID>{{{sellerCountry}}}</ram:CountryID>
         </ram:PostalTradeAddress>
         {{#sellerEmail}}
         <ram:URIUniversalCommunication>
-          <ram:URIID schemeID="EM">{{sellerEmail}}</ram:URIID>
+          <ram:URIID schemeID="EM">{{{sellerEmail}}}</ram:URIID>
         </ram:URIUniversalCommunication>
         {{/sellerEmail}}
         <ram:SpecifiedTaxRegistration>
-          <ram:ID schemeID="VA">{{sellerVatId}}</ram:ID>
+          <ram:ID schemeID="VA">{{{sellerVatId}}}</ram:ID>
         </ram:SpecifiedTaxRegistration>
       </ram:SellerTradeParty>
       <ram:BuyerTradeParty>
-        <ram:Name>{{buyerName}}</ram:Name>
+        <ram:Name>{{{buyerName}}}</ram:Name>
         <ram:PostalTradeAddress>
-          {{#buyerZip}}<ram:PostcodeCode>{{buyerZip}}</ram:PostcodeCode>{{/buyerZip}}
-          {{#buyerStreet}}<ram:LineOne>{{buyerStreet}}</ram:LineOne>{{/buyerStreet}}
-          {{#buyerCity}}<ram:CityName>{{buyerCity}}</ram:CityName>{{/buyerCity}}
-          <ram:CountryID>{{buyerCountry}}</ram:CountryID>
+          {{#buyerZip}}<ram:PostcodeCode>{{{buyerZip}}}</ram:PostcodeCode>{{/buyerZip}}
+          {{#buyerStreet}}<ram:LineOne>{{{buyerStreet}}}</ram:LineOne>{{/buyerStreet}}
+          {{#buyerCity}}<ram:CityName>{{{buyerCity}}}</ram:CityName>{{/buyerCity}}
+          <ram:CountryID>{{{buyerCountry}}}</ram:CountryID>
         </ram:PostalTradeAddress>
         {{#buyerEmail}}
         <ram:URIUniversalCommunication>
-          <ram:URIID schemeID="EM">{{buyerEmail}}</ram:URIID>
+          <ram:URIID schemeID="EM">{{{buyerEmail}}}</ram:URIID>
         </ram:URIUniversalCommunication>
         {{/buyerEmail}}
         {{#buyerVatId}}
         <ram:SpecifiedTaxRegistration>
-          <ram:ID schemeID="VA">{{buyerVatId}}</ram:ID>
+          <ram:ID schemeID="VA">{{{buyerVatId}}}</ram:ID>
         </ram:SpecifiedTaxRegistration>
         {{/buyerVatId}}
       </ram:BuyerTradeParty>
@@ -279,22 +279,22 @@ const CII_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
     <ram:ApplicableHeaderTradeDelivery>
       <ram:ActualDeliverySupplyChainEvent>
         <ram:OccurrenceDateTime>
-          <udt:DateTimeString format="102">{{deliveryDate}}</udt:DateTimeString>
+          <udt:DateTimeString format="102">{{{deliveryDate}}}</udt:DateTimeString>
         </ram:OccurrenceDateTime>
       </ram:ActualDeliverySupplyChainEvent>
     </ram:ApplicableHeaderTradeDelivery>
     <!-- Settlement -->
     <ram:ApplicableHeaderTradeSettlement>
-      <ram:InvoiceCurrencyCode>{{currency}}</ram:InvoiceCurrencyCode>
+      <ram:InvoiceCurrencyCode>{{{currency}}}</ram:InvoiceCurrencyCode>
       {{#sellerIban}}
       <ram:SpecifiedTradeSettlementPaymentMeans>
         <ram:TypeCode>58</ram:TypeCode>
         <ram:PayeePartyCreditorFinancialAccount>
-          <ram:IBANID>{{sellerIban}}</ram:IBANID>
+          <ram:IBANID>{{{sellerIban}}}</ram:IBANID>
         </ram:PayeePartyCreditorFinancialAccount>
         {{#sellerBic}}
         <ram:PayeeSpecifiedCreditorFinancialInstitution>
-          <ram:BICID>{{sellerBic}}</ram:BICID>
+          <ram:BICID>{{{sellerBic}}}</ram:BICID>
         </ram:PayeeSpecifiedCreditorFinancialInstitution>
         {{/sellerBic}}
       </ram:SpecifiedTradeSettlementPaymentMeans>
@@ -302,25 +302,25 @@ const CII_TEMPLATE = `<?xml version="1.0" encoding="UTF-8"?>
       <!-- Tax subtotals -->
       {{#taxLines}}
       <ram:ApplicableTradeTax>
-        <ram:CalculatedAmount>{{taxAmount}}</ram:CalculatedAmount>
+        <ram:CalculatedAmount>{{{taxAmount}}}</ram:CalculatedAmount>
         <ram:TypeCode>VAT</ram:TypeCode>
-        <ram:BasisAmount>{{taxableAmount}}</ram:BasisAmount>
-        <ram:CategoryCode>{{taxCategoryCode}}</ram:CategoryCode>
-        <ram:RateApplicablePercent>{{taxPercent}}</ram:RateApplicablePercent>
+        <ram:BasisAmount>{{{taxableAmount}}}</ram:BasisAmount>
+        <ram:CategoryCode>{{{taxCategoryCode}}}</ram:CategoryCode>
+        <ram:RateApplicablePercent>{{{taxPercent}}}</ram:RateApplicablePercent>
       </ram:ApplicableTradeTax>
       {{/taxLines}}
       <ram:SpecifiedTradePaymentTerms>
-        <ram:Description>{{paymentTermsText}}</ram:Description>
+        <ram:Description>{{{paymentTermsText}}}</ram:Description>
         <ram:DueDateDateTime>
-          <udt:DateTimeString format="102">{{dueDate}}</udt:DateTimeString>
+          <udt:DateTimeString format="102">{{{dueDate}}}</udt:DateTimeString>
         </ram:DueDateDateTime>
       </ram:SpecifiedTradePaymentTerms>
       <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
-        <ram:LineTotalAmount>{{subtotalNet}}</ram:LineTotalAmount>
-        <ram:TaxBasisTotalAmount>{{subtotalNet}}</ram:TaxBasisTotalAmount>
-        <ram:TaxTotalAmount currencyID="{{currency}}">{{totalTax}}</ram:TaxTotalAmount>
-        <ram:GrandTotalAmount>{{totalGross}}</ram:GrandTotalAmount>
-        <ram:DuePayableAmount>{{totalGross}}</ram:DuePayableAmount>
+        <ram:LineTotalAmount>{{{subtotalNet}}}</ram:LineTotalAmount>
+        <ram:TaxBasisTotalAmount>{{{subtotalNet}}}</ram:TaxBasisTotalAmount>
+        <ram:TaxTotalAmount currencyID="{{{currency}}}">{{{totalTax}}}</ram:TaxTotalAmount>
+        <ram:GrandTotalAmount>{{{totalGross}}}</ram:GrandTotalAmount>
+        <ram:DuePayableAmount>{{{totalGross}}}</ram:DuePayableAmount>
       </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
     </ram:ApplicableHeaderTradeSettlement>
   </rsm:SupplyChainTradeTransaction>

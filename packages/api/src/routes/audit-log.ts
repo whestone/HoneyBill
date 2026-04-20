@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { auditLog } from "../db/schema.js";
+import { verifyAuditChain } from "../services/audit.service.js";
 
 export async function auditLogRoutes(app: FastifyInstance) {
   app.get("/", { onRequest: [app.authenticate] }, async (req, reply) => {
@@ -36,5 +37,11 @@ export async function auditLogRoutes(app: FastifyInstance) {
     ]);
 
     return reply.send({ data: rows, total, page, limit, totalPages: Math.ceil(total / limit) });
+  });
+
+  // GoBD: Integritätsprüfung der Hash-Kette
+  app.get("/verify", { onRequest: [app.authenticate] }, async (_req, reply) => {
+    const result = await verifyAuditChain();
+    return reply.status(result.ok ? 200 : 409).send(result);
   });
 }

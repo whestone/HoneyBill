@@ -617,24 +617,58 @@ function SendEmailModal({
   );
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message?: string } | null>(null);
+  // Anhang-Format: normale PDF, ZUGFeRD (PDF mit eingebettetem XML), oder PDF + separate XRechnung-XML.
+  const [attachFormat, setAttachFormat] = useState<"PDF" | "ZUGFERD" | "XRECHNUNG">("PDF");
+  const isFinalized = doc.status !== "DRAFT";
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const handleSend = async () => {
     setSending(true);
     setResult(null);
     try {
       if (emailSettings.provider === "outlook") {
-        // Generate and download PDF first so user can attach it
+        // Datei(en) je nach gewaehltem Format erzeugen und herunterladen, damit der
+        // User sie manuell in Outlook anhaengen kann.
         const pdfBlob = await pdf(<InvoicePDF doc={doc} company={company} />).toBlob();
-        const pdfUrl = URL.createObjectURL(pdfBlob);
-        const a = document.createElement("a");
-        a.href = pdfUrl;
-        a.download = `${doc.documentNumber ?? "dokument"}.pdf`;
-        a.click();
-        URL.revokeObjectURL(pdfUrl);
-        // Then open mailto link
+        const token = JSON.parse(localStorage.getItem("honeybill-auth") ?? "{}").state?.token ?? "";
+        const baseName = doc.documentNumber ?? "dokument";
+
+        let message = "";
+        if (attachFormat === "PDF" || !isFinalized) {
+          downloadBlob(pdfBlob, `${baseName}.pdf`);
+          message = "PDF wurde heruntergeladen — bitte als Anhang hinzufügen.";
+        } else if (attachFormat === "ZUGFERD") {
+          // PDF an Server schicken, ZUGFeRD-PDF/A-3 zurueckbekommen.
+          const form = new FormData();
+          form.append("file", pdfBlob, "invoice.pdf");
+          const res = await fetch(`/api/v1/documents/${doc.id}/zugferd-pdf`, {
+            method: "POST", body: form, headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) throw new Error("ZUGFeRD-Paketierung fehlgeschlagen");
+          downloadBlob(await res.blob(), `zugferd-${baseName}.pdf`);
+          message = "ZUGFeRD-PDF wurde heruntergeladen — bitte als Anhang hinzufügen.";
+        } else {
+          // XRECHNUNG: beide Dateien herunterladen.
+          downloadBlob(pdfBlob, `${baseName}.pdf`);
+          const xmlRes = await fetch(`/api/v1/documents/${doc.id}/xrechnung-xml`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!xmlRes.ok) throw new Error("XRechnung-XML konnte nicht erzeugt werden");
+          downloadBlob(await xmlRes.blob(), `xrechnung-${baseName}.xml`);
+          message = "PDF und XRechnung-XML wurden heruntergeladen — bitte beide als Anhang hinzufügen.";
+        }
+
         const mailtoUrl = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         window.open(mailtoUrl, "_blank");
-        setResult({ ok: true, message: "PDF wurde heruntergeladen — bitte als Anhang hinzufügen." });
+        setResult({ ok: true, message });
         return;
       }
       // SMTP: generate PDF blob and post as multipart
@@ -644,6 +678,8 @@ function SendEmailModal({
       form.append("subject", subject);
       form.append("body", body);
       form.append("attachPdf", "true");
+      form.append("attachFormat", attachFormat);
+      if (attachFormat !== "PDF") form.append("documentId", String(doc.id));
       form.append("file", pdfBlob, `${doc.documentNumber ?? "dokument"}.pdf`);
       const token = JSON.parse(localStorage.getItem("honeybill-auth") ?? "{}").state?.token ?? "";
       const res = await fetch("/api/v1/settings/company/email/send-document", {
@@ -686,11 +722,43 @@ function SendEmailModal({
             <label className="label">Text</label>
             <textarea rows={10} value={body} onChange={(e) => setBody(e.target.value)} className="input w-full resize-y font-mono text-xs" />
           </div>
-          {emailSettings.provider === "smtp" && (
+          <div className="space-y-2">
+            <label className="label">Anhang</label>
+            <select
+              className="input"
+              value={attachFormat}
+              onChange={(e) => setAttachFormat(e.target.value as "PDF" | "ZUGFERD" | "XRECHNUNG")}
+              disabled={!isFinalized && attachFormat !== "PDF"}
+            >
+              <option value="PDF">PDF</option>
+              <option value="ZUGFERD" disabled={!isFinalized}>
+                ZUGFeRD PDF (PDF mit eingebettetem XML)
+              </option>
+              <option value="XRECHNUNG" disabled={!isFinalized}>
+                PDF + XRechnung XML (zwei Anhänge)
+              </option>
+            </select>
+            {!isFinalized && (
+              <p className="text-xs text-amber-600">
+                E-Rechnung-Formate sind erst nach Finalisierung verfügbar.
+              </p>
+            )}
             <p className="text-xs text-gray-500">
-              Das PDF wird automatisch als Anhang beigefügt ({doc.documentNumber ?? "Entwurf"}.pdf).
+              {emailSettings.provider === "outlook" ? (
+                <>
+                  {attachFormat === "PDF" && `Die PDF wird heruntergeladen — bitte in Outlook als Anhang hinzufügen (${doc.documentNumber ?? "Entwurf"}.pdf).`}
+                  {attachFormat === "ZUGFERD" && `Die ZUGFeRD-PDF (PDF/A-3 mit eingebettetem CII-XML) wird heruntergeladen — bitte in Outlook als Anhang hinzufügen.`}
+                  {attachFormat === "XRECHNUNG" && `PDF und XRechnung-3.0-XML werden heruntergeladen — bitte beide in Outlook als Anhang hinzufügen.`}
+                </>
+              ) : (
+                <>
+                  {attachFormat === "PDF" && `Das PDF wird als Anhang beigefügt (${doc.documentNumber ?? "Entwurf"}.pdf).`}
+                  {attachFormat === "ZUGFERD" && `ZUGFeRD PDF/A-3 mit eingebettetem CII-XML (XRechnung-Profil) — ein Anhang, vom Empfänger automatisch verarbeitbar.`}
+                  {attachFormat === "XRECHNUNG" && `PDF plus separate XRechnung 3.0 XML — zwei Anhänge, für Public-Sector-Empfänger.`}
+                </>
+              )}
             </p>
-          )}
+          </div>
           {result && (
             <p className={`text-sm ${result.ok ? "text-green-600" : "text-red-600"}`}>
               {result.ok

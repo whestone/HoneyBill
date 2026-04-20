@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import multipart from "@fastify/multipart";
+import rateLimit from "@fastify/rate-limit";
 import staticFiles from "@fastify/static";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -41,6 +42,17 @@ await app.register(jwt, {
 
 await app.register(multipart, {
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
+
+// Globales, großzügiges Rate-Limit.
+// Strengere Limits werden direkt in den Auth-Routen definiert.
+// Hinweis: CSRF ist hier nicht nötig, da Auth per Bearer-JWT im Header läuft
+// (keine Cookie-Authentifizierung -> kein Cross-Site-Request-Forgery-Vektor).
+await app.register(rateLimit, {
+  global: true,
+  max: 300,
+  timeWindow: "1 minute",
+  // Die Auth-Routes setzen eigene, strengere Limits per `config.rateLimit`.
 });
 
 await app.register(staticFiles, {

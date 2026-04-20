@@ -19,6 +19,13 @@ import { generateZugferdXml, generateXRechnungXml } from "../services/einvoice/x
 import { packageZugferdPdf } from "../services/einvoice/zugferd.service.js";
 import { db as rawDb } from "../db/index.js";
 import type { Customer, CompanySettings, Document } from "@honeybill/shared";
+
+/** Document as returned by getFullDocument() — lineItems & taxLines are guaranteed present. */
+type FullDocument = Document & {
+  lineItems: NonNullable<Document["lineItems"]>;
+  taxLines: NonNullable<Document["taxLines"]>;
+  customer?: Customer;
+};
 import { companySettings, customers } from "../db/schema.js";
 import path from "node:path";
 import fs from "node:fs";
@@ -39,7 +46,13 @@ export async function documentRoutes(app: FastifyInstance) {
     if (q.type) conditions.push(eq(documents.documentType, q.type));
     if (q.status) conditions.push(eq(documents.status, q.status));
     if (q.customer) conditions.push(eq(documents.customerId, Number(q.customer)));
-    if (q.q) conditions.push(sql`${documents.documentNumber} LIKE ${"%" + q.q + "%"}`);
+    if (q.q) {
+      // LIKE-Wildcards (% _) escapen + Eingabe auf 100 Zeichen begrenzen, um
+      // Performance-Angriffe und versehentliches Ausufern der Treffermenge zu verhindern.
+      const raw = String(q.q).slice(0, 100);
+      const escaped = raw.replace(/[\\%_]/g, (c) => `\\${c}`);
+      conditions.push(sql`${documents.documentNumber} LIKE ${"%" + escaped + "%"} ESCAPE '\\'`);
+    }
 
     const [total, rows] = await Promise.all([
       db
@@ -256,7 +269,11 @@ export async function documentRoutes(app: FastifyInstance) {
         einvoiceProfile: (source.einvoiceProfile as "ZUGFERD_EXTENDED" | "XRECHNUNG" | null | undefined),
         globalDiscountPct: source.globalDiscountPct ?? "0.00",
         globalDiscountType: (source.globalDiscountType ?? "pct") as "pct" | "abs",
-        layoutOverride: source.layoutOverride ?? undefined,
+        layoutOverride: source.layoutOverride
+          ? (typeof source.layoutOverride === "string"
+              ? JSON.parse(source.layoutOverride)
+              : source.layoutOverride)
+          : undefined,
         lineItems: (source.lineItems ?? []).map((li) => ({
           position: li.position,
           lineType: li.lineType as "ITEM" | "TEXT" | "SUBTOTAL" | "PAGEBREAK",
@@ -458,7 +475,7 @@ export async function documentRoutes(app: FastifyInstance) {
     const doc = await getFullDocument(Number((req.params as { id: string }).id));
     if (!doc) return reply.status(404).send({ message: "Beleg nicht gefunden" });
     const company = await getCompanySettings();
-    const xml = generateXRechnungXml(doc as any, doc.customer as Customer, company);
+    const xml = generateXRechnungXml(doc as unknown as FullDocument, doc.customer as Customer, company);
     reply
       .header("Content-Type", "application/xml")
       .header("Content-Disposition", `attachment; filename="xrechnung-${doc.documentNumber}.xml"`);
@@ -472,11 +489,12 @@ export async function documentRoutes(app: FastifyInstance) {
     const doc = await getFullDocument(Number(id));
     if (!doc) return reply.status(404).send({ message: "Beleg nicht gefunden" });
 
-    const data = await (req as any).file();
+    const data = await req.file();
+    if (!data) return reply.status(400).send({ message: "Kein PDF im Request" });
     const pdfBytes = await data.toBuffer();
 
     const company = await getCompanySettings();
-    const xml = generateZugferdXml(doc as any, doc.customer as Customer, company);
+    const xml = generateZugferdXml(doc as unknown as FullDocument, doc.customer as Customer, company);
     const zugferdPdf = await packageZugferdPdf(new Uint8Array(pdfBytes), xml);
 
     // Save to disk
@@ -502,7 +520,7 @@ export async function documentRoutes(app: FastifyInstance) {
   });
 }
 
-async function getFullDocument(id: number) {
+export async function getFullDocument(id: number) {
   return db.query.documents.findFirst({
     where: eq(documents.id, id),
     with: {
@@ -513,7 +531,7 @@ async function getFullDocument(id: number) {
   });
 }
 
-async function getCompanySettings() {
+export async function getCompanySettings() {
   const [row] = await db.select().from(companySettings).limit(1);
   return (row ?? {}) as CompanySettings;
 }

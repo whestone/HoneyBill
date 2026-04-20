@@ -41,6 +41,11 @@ export const auditLog = sqliteTable("audit_log", {
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+  // GoBD Hash-Chain: prevHash verweist auf den Hash des Vorgänger-Eintrags.
+  // hash = SHA-256(prevHash || canonicalJSON(entry)). Beide werden vom
+  // Appender-Service gesetzt; Trigger blockieren UPDATE/DELETE.
+  prevHash: text("prev_hash"),
+  hash: text("hash"),
 });
 
 // ─── Users ────────────────────────────────────────────────────────────────────
@@ -157,6 +162,7 @@ export const numberSeries = sqliteTable("number_series", {
   nextCounter: int("next_counter").notNull().default(1),
   lastResetAt: text("last_reset_at"),
   resetYearly: int("reset_yearly", { mode: "boolean" }).notNull().default(true),
+  resetMonthly: int("reset_monthly", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
 });

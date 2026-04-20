@@ -15,6 +15,7 @@ import type { CreateDocumentInput, UpdateDocumentInput } from "@honeybill/shared
 import { computeLineGross, computeLineNet, computeLineTax } from "@honeybill/shared";
 import { assignNextNumber } from "./numbering.service.js";
 import type { DocumentType } from "@honeybill/shared";
+import { appendAudit } from "./audit.service.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -272,7 +273,27 @@ export async function finalizeDocument(db: DB, docId: number, userId: number | n
       );
   })();
 
-  return db.query.documents.findFirst({ where: eq(documents.id, docId) });
+  const finalized = await db.query.documents.findFirst({ where: eq(documents.id, docId) });
+
+  // GoBD: Finalisierung im unveränderbaren Audit-Trail festhalten.
+  await appendAudit({
+    userId,
+    action: "finalize",
+    entityType: "document",
+    entityId: docId,
+    newData: {
+      documentNumber: docNumber,
+      documentType: doc.documentType,
+      customerId: doc.customerId,
+      issueDate,
+      dueDate,
+      subtotalNet,
+      totalTax,
+      totalGross,
+    },
+  });
+
+  return finalized;
 }
 
 // ─── Cancel Document ──────────────────────────────────────────────────────────
@@ -288,6 +309,15 @@ export async function cancelDocument(db: DB, docId: number, userId: number | nul
     .update(documents)
     .set({ status: "CANCELLED", updatedAt: new Date().toISOString() })
     .where(eq(documents.id, docId));
+
+  await appendAudit({
+    userId,
+    action: "cancel",
+    entityType: "document",
+    entityId: docId,
+    oldData: { status: doc.status },
+    newData: { status: "CANCELLED", documentNumber: doc.documentNumber },
+  });
 }
 
 // ─── Record Payment ───────────────────────────────────────────────────────────
@@ -341,6 +371,21 @@ export async function recordPayment(
     .update(documents)
     .set({ status: newStatus, updatedAt: new Date().toISOString() })
     .where(eq(documents.id, docId));
+
+  await appendAudit({
+    userId,
+    action: "payment",
+    entityType: "document",
+    entityId: docId,
+    newData: {
+      paymentId: payment?.id ?? null,
+      amount: input.amount,
+      paymentDate: input.paymentDate,
+      paymentMethod: input.paymentMethod ?? null,
+      newStatus,
+      totalPaid: totalPaid.toFixed(2),
+    },
+  });
 
   return payment;
 }

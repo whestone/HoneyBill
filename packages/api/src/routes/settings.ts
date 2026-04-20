@@ -10,6 +10,10 @@ import {
   UpdatePdfSettingsSchema, UpdateEmailSettingsSchema, SendDocumentEmailSchema,
   DOCUMENT_TYPE_LABELS, formatEur,
 } from "@honeybill/shared";
+import type { Customer } from "@honeybill/shared";
+import { generateZugferdXml, generateXRechnungXml } from "../services/einvoice/xrechnung.service.js";
+import { packageZugferdPdf } from "../services/einvoice/zugferd.service.js";
+import { getFullDocument, getCompanySettings } from "./documents.js";
 import { previewNextNumber } from "../services/numbering.service.js";
 import { sqlite } from "../db/index.js";
 import { config } from "../config.js";
@@ -124,6 +128,8 @@ export async function settingsRoutes(app: FastifyInstance) {
       subject: fields.subject,
       body: fields.body,
       attachPdf: fields.attachPdf !== "false",
+      attachFormat: fields.attachFormat ?? "PDF",
+      documentId: fields.documentId ? Number(fields.documentId) : undefined,
     });
 
     const [row] = await db.select().from(companySettings).limit(1);
@@ -131,6 +137,35 @@ export async function settingsRoutes(app: FastifyInstance) {
 
     if (emailSettings?.provider === "outlook" || !emailSettings?.smtp) {
       return reply.status(400).send({ message: "Für den Outlook-Modus bitte den mailto-Link im Browser nutzen." });
+    }
+
+    // Anhänge je nach Format aufbauen.
+    const attachments: NonNullable<nodemailer.SendMailOptions["attachments"]> = [];
+    if (pdfBuffer && input.attachPdf) {
+      if (input.attachFormat === "ZUGFERD" || input.attachFormat === "XRECHNUNG") {
+        if (!input.documentId) {
+          return reply.status(400).send({ message: "documentId erforderlich für E-Rechnung-Anhang." });
+        }
+        const doc = await getFullDocument(input.documentId);
+        if (!doc) return reply.status(404).send({ message: "Beleg nicht gefunden" });
+        const company = await getCompanySettings();
+
+        if (input.attachFormat === "ZUGFERD") {
+          // PDF durch ZUGFeRD-PDF/A-3 ersetzen (XML eingebettet).
+          const xml = generateZugferdXml(doc as any, doc.customer as Customer, company);
+          const zugferd = await packageZugferdPdf(new Uint8Array(pdfBuffer), xml);
+          const zfName = `zugferd-${doc.documentNumber ?? "dokument"}.pdf`;
+          attachments.push({ filename: zfName, content: Buffer.from(zugferd), contentType: "application/pdf" });
+        } else {
+          // XRECHNUNG: PDF + separate XRechnung-XML.
+          attachments.push({ filename: pdfFilename, content: pdfBuffer, contentType: "application/pdf" });
+          const xml = generateXRechnungXml(doc as any, doc.customer as Customer, company);
+          const xmlName = `xrechnung-${doc.documentNumber ?? "dokument"}.xml`;
+          attachments.push({ filename: xmlName, content: xml, contentType: "application/xml" });
+        }
+      } else {
+        attachments.push({ filename: pdfFilename, content: pdfBuffer, contentType: "application/pdf" });
+      }
     }
 
     const { smtp } = emailSettings;
@@ -145,9 +180,7 @@ export async function settingsRoutes(app: FastifyInstance) {
         to: input.to,
         subject: input.subject,
         text: input.body,
-        attachments: pdfBuffer && input.attachPdf
-          ? [{ filename: pdfFilename, content: pdfBuffer, contentType: "application/pdf" }]
-          : [],
+        attachments,
       };
 
       await transporter.sendMail(mailOptions);
@@ -191,7 +224,34 @@ export async function taxRateRoutes(app: FastifyInstance) {
     } else {
       rows = await db.select().from(taxRates).orderBy(taxRates.validFrom);
     }
-    return reply.send(rows);
+
+    // Usage-Counts anhaengen, damit die UI "Loeschen"-Buttons passend deaktivieren kann.
+    // Zwei Aggregat-Queries sind billiger als N+1.
+    const rateIds = rows.map((r) => r.id);
+    const usage = new Map<number, { products: number; lineItems: number }>();
+    for (const id of rateIds) usage.set(id, { products: 0, lineItems: 0 });
+    if (rateIds.length > 0) {
+      const idList = rateIds.join(",");
+      const prodRows = sqlite
+        .prepare(
+          `SELECT tax_rate_id AS id, COUNT(*) AS c FROM products WHERE tax_rate_id IN (${idList}) GROUP BY tax_rate_id`,
+        )
+        .all() as { id: number; c: number }[];
+      for (const r of prodRows) usage.get(r.id)!.products = r.c;
+      const liRows = sqlite
+        .prepare(
+          `SELECT tax_rate_id AS id, COUNT(*) AS c FROM document_line_items WHERE tax_rate_id IN (${idList}) GROUP BY tax_rate_id`,
+        )
+        .all() as { id: number; c: number }[];
+      for (const r of liRows) usage.get(r.id)!.lineItems = r.c;
+    }
+
+    const enriched = rows.map((r) => ({
+      ...r,
+      usageProducts: usage.get(r.id)?.products ?? 0,
+      usageLineItems: usage.get(r.id)?.lineItems ?? 0,
+    }));
+    return reply.send(enriched);
   });
 
   // POST /api/v1/tax-rates
