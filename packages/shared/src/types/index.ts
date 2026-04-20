@@ -72,6 +72,10 @@ export interface Customer {
   isArchived: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Summe offener Rechnungsbetraege (nur gesetzt in Listen-Antworten). */
+  openAmount?: string;
+  /** Umsatz der letzten 365 Tage (nur gesetzt in Listen-Antworten). */
+  revenue365?: string;
 }
 
 export interface Product {

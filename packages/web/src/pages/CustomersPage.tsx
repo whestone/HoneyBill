@@ -9,6 +9,16 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateCustomerSchema, type CreateCustomerInput } from "@honeybill/shared";
 
+const EUR_FMT = new Intl.NumberFormat("de-DE", {
+  style: "currency",
+  currency: "EUR",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+function formatEur(n: number): string {
+  return EUR_FMT.format(n);
+}
+
 export function CustomersPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -60,29 +70,41 @@ export function CustomersPage() {
                 <th className="table-header">Name</th>
                 <th className="table-header">E-Mail</th>
                 <th className="table-header">Ort</th>
+                <th className="table-header text-right">Offen</th>
+                <th className="table-header text-right">Umsatz 365 T.</th>
                 <th className="table-header">USt-IdNr.</th>
               </tr>
             </thead>
             <tbody>
-              {data.data.map((c) => (
-                <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="table-cell font-mono text-xs">{c.customerNumber}</td>
-                  <td className="table-cell">
-                    <Link
-                      to="/customers/$id"
-                      params={{ id: String(c.id) }}
-                      className="font-medium text-honey-600 hover:underline"
-                    >
-                      {c.companyName ||
-                        `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim() ||
-                        "—"}
-                    </Link>
-                  </td>
-                  <td className="table-cell text-gray-500">{c.email ?? "—"}</td>
-                  <td className="table-cell text-gray-500">{c.billCity ?? "—"}</td>
-                  <td className="table-cell text-gray-500 font-mono text-xs">{c.vatId ?? "—"}</td>
-                </tr>
-              ))}
+              {data.data.map((c) => {
+                const open = Number(c.openAmount ?? "0");
+                const rev = Number(c.revenue365 ?? "0");
+                return (
+                  <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="table-cell font-mono text-xs">{c.customerNumber}</td>
+                    <td className="table-cell">
+                      <Link
+                        to="/customers/$id"
+                        params={{ id: String(c.id) }}
+                        className="font-medium text-honey-600 hover:underline"
+                      >
+                        {c.companyName ||
+                          `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim() ||
+                          "—"}
+                      </Link>
+                    </td>
+                    <td className="table-cell text-gray-500">{c.email ?? "—"}</td>
+                    <td className="table-cell text-gray-500">{c.billCity ?? "—"}</td>
+                    <td className={`table-cell text-right tabular-nums ${open > 0 ? "text-red-600 font-medium" : "text-gray-400"}`}>
+                      {open > 0 ? formatEur(open) : "—"}
+                    </td>
+                    <td className="table-cell text-right tabular-nums text-gray-700">
+                      {rev > 0 ? formatEur(rev) : "—"}
+                    </td>
+                    <td className="table-cell text-gray-500 font-mono text-xs">{c.vatId ?? "—"}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

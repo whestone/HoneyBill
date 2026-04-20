@@ -1,0 +1,1 @@
+{"root":["./src/decimal.ts","./src/index.ts","./src/schemas/customer.schema.ts","./src/schemas/document.schema.ts","./src/schemas/product.schema.ts","./src/schemas/settings.schema.ts","./src/types/index.ts"],"version":"5.9.3"}
