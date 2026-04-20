@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS role_permissions (
 CREATE INDEX IF NOT EXISTS idx_role_permissions_role ON role_permissions(role);
 
 -- Seed: sinnvolle Defaults fuer accountant + viewer.
--- Ressourcen: documents, customers, products, openItems, reports,
+-- Ressourcen: documents, customers, products, openItems,
 --             settings.company, settings.taxRates, settings.numbering,
 --             settings.pdfLayout, settings.email
 
@@ -23,7 +23,6 @@ INSERT OR IGNORE INTO role_permissions (role, resource, can_view, can_edit) VALU
   ('accountant', 'customers',          1, 1),
   ('accountant', 'products',           1, 1),
   ('accountant', 'openItems',          1, 1),
-  ('accountant', 'reports',            1, 0),
   ('accountant', 'settings.company',   1, 0),
   ('accountant', 'settings.taxRates',  1, 0),
   ('accountant', 'settings.numbering', 1, 0),
@@ -36,7 +35,6 @@ INSERT OR IGNORE INTO role_permissions (role, resource, can_view, can_edit) VALU
   ('viewer', 'customers',          1, 0),
   ('viewer', 'products',           1, 0),
   ('viewer', 'openItems',          1, 0),
-  ('viewer', 'reports',            1, 0),
   ('viewer', 'settings.company',   0, 0),
   ('viewer', 'settings.taxRates',  0, 0),
   ('viewer', 'settings.numbering', 0, 0),
