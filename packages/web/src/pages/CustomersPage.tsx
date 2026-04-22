@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateCustomerSchema, type CreateCustomerInput } from "@honeybill/shared";
 import { useCan } from "@/api/hooks/usePermissions";
+import { Label } from "@/components/ui/Label";
 
 const EUR_FMT = new Intl.NumberFormat("de-DE", {
   style: "currency",
@@ -133,7 +134,7 @@ export function CustomersPage() {
 
 function CreateCustomerModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const create = useCreateCustomer();
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<CreateCustomerInput>({
+  const { register, handleSubmit, reset } = useForm<CreateCustomerInput>({
     resolver: zodResolver(CreateCustomerSchema),
     defaultValues: { billCountry: "DE", paymentDays: 14, taxExempt: false, reverseCharge: false },
   });
@@ -147,11 +148,11 @@ function CreateCustomerModal({ open, onClose }: { open: boolean; onClose: () => 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="label">Firmenname</label>
+            <Label>Firmenname</Label>
             <input {...register("companyName")} className="input" placeholder="Muster GmbH" />
           </div>
           <div>
-            <label className="label">Anrede</label>
+            <Label>Anrede</Label>
             <select {...register("salutation")} className="input">
               <option value="">—</option>
               <option>Herr</option>
@@ -160,43 +161,43 @@ function CreateCustomerModal({ open, onClose }: { open: boolean; onClose: () => 
             </select>
           </div>
           <div>
-            <label className="label">Vorname</label>
+            <Label>Vorname</Label>
             <input {...register("firstName")} className="input" />
           </div>
           <div>
-            <label className="label">Nachname</label>
+            <Label>Nachname</Label>
             <input {...register("lastName")} className="input" />
           </div>
           <div>
-            <label className="label">E-Mail</label>
+            <Label>E-Mail</Label>
             <input {...register("email")} type="email" className="input" />
           </div>
           <div>
-            <label className="label">Telefon</label>
+            <Label>Telefon</Label>
             <input {...register("phone")} className="input" />
           </div>
           <div className="col-span-2">
-            <label className="label">Straße (Rechnung)</label>
+            <Label>Straße (Rechnung)</Label>
             <input {...register("billStreet")} className="input" />
           </div>
           <div>
-            <label className="label">PLZ</label>
+            <Label>PLZ</Label>
             <input {...register("billZip")} className="input" />
           </div>
           <div>
-            <label className="label">Ort</label>
+            <Label>Ort</Label>
             <input {...register("billCity")} className="input" />
           </div>
           <div>
-            <label className="label">USt-IdNr.</label>
+            <Label>USt-IdNr.</Label>
             <input {...register("vatId")} className="input" placeholder="DE123456789" />
           </div>
           <div>
-            <label className="label">Zahlungsziel (Tage)</label>
+            <Label>Zahlungsziel (Tage)</Label>
             <input {...register("paymentDays", { valueAsNumber: true })} type="number" className="input" min={0} />
           </div>
           <div>
-            <label className="label">Leitweg-ID (XRechnung)</label>
+            <Label>Leitweg-ID (XRechnung)</Label>
             <input {...register("leitwegId")} className="input" placeholder="04011000-1234567890-06" />
           </div>
         </div>
