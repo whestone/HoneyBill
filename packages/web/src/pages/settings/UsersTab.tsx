@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, Eye, EyeOff, Users, ShieldCheck, UserCog, BadgeCheck } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
+import { Label } from "@/components/ui/Label";
 import type { User, UserRole } from "@honeybill/shared";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -55,7 +56,7 @@ export function UsersTab({ currentUserId }: { currentUserId: number }) {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name / E-Mail</th>
+              <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name / Benutzer</th>
               <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Rolle</th>
               <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
               <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Letzter Login</th>
@@ -151,6 +152,7 @@ function UserFormModal({
   const isEdit = !!user;
   const [form, setForm] = useState({
     email: user?.email ?? "",
+    emailAddress: user?.emailAddress ?? "",
     firstName: user?.firstName ?? "",
     lastName: user?.lastName ?? "",
     phone: user?.phone ?? "",
@@ -184,6 +186,7 @@ function UserFormModal({
       if (isEdit) {
         const patch: Record<string, unknown> = {
           email: form.email,
+          emailAddress: form.emailAddress || null,
           fullName,
           firstName: form.firstName || null,
           lastName: form.lastName || null,
@@ -196,6 +199,7 @@ function UserFormModal({
       } else {
         await api.post("/users", {
           email: form.email,
+          emailAddress: form.emailAddress || null,
           fullName,
           firstName: form.firstName || null,
           lastName: form.lastName || null,
@@ -217,13 +221,26 @@ function UserFormModal({
     <Modal open onClose={onClose} title={isEdit ? "Benutzer bearbeiten" : "Benutzer hinzufügen"} size="sm">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
+          <Label required>Benutzername</Label>
+          <input
+            className="input"
+            type="text"
+            required
+            autoComplete="username"
+            placeholder="z. B. max oder max@firma.de"
+            value={form.email}
+            onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+          />
+        </div>
+        <div>
           <label className="label">E-Mail-Adresse</label>
           <input
             className="input"
             type="email"
-            required
-            value={form.email}
-            onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+            autoComplete="email"
+            placeholder="max@firma.de"
+            value={form.emailAddress}
+            onChange={(e) => setForm((f) => ({ ...f, emailAddress: e.target.value }))}
           />
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -273,7 +290,7 @@ function UserFormModal({
           </select>
         </div>
         <div>
-          <label className="label">{isEdit ? "Neues Passwort (leer = unverändert)" : "Passwort"}</label>
+          <Label required={!isEdit}>{isEdit ? "Neues Passwort (leer = unverändert)" : "Passwort"}</Label>
           <div className="relative">
             <input
               className="input pr-10"
@@ -290,7 +307,7 @@ function UserFormModal({
         </div>
         {(!isEdit || form.password) && (
           <div>
-            <label className="label">Passwort bestätigen</label>
+            <Label required={!isEdit}>Passwort bestätigen</Label>
             <input
               className="input"
               type={showPw ? "text" : "password"}

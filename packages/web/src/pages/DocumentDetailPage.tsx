@@ -591,7 +591,7 @@ function resolvePlaceholders(template: string, doc: Document, company: CompanySe
     .replace(/\{\{mitarbeiterName\}\}/g, mitarbeiterName)
     .replace(/\{\{mitarbeiterVorname\}\}/g, me?.firstName ?? "")
     .replace(/\{\{mitarbeiterNachname\}\}/g, me?.lastName ?? "")
-    .replace(/\{\{mitarbeiterEmail\}\}/g, me?.email ?? "")
+    .replace(/\{\{mitarbeiterEmail\}\}/g, me?.emailAddress ?? "")
     .replace(/\{\{mitarbeiterTelefon\}\}/g, me?.phone ?? "")
     .replace(/\{\{mitarbeiterMobil\}\}/g, me?.mobile ?? "");
 }

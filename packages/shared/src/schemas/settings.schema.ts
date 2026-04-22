@@ -98,7 +98,10 @@ export const SendDocumentEmailSchema = z.object({
 });
 
 export const CreateUserSchema = z.object({
-  email: z.string().email(),
+  // Login-Name (freier Text, z. B. "max" oder "max@firma.de")
+  email: z.string().min(1).max(255),
+  // Optionale Kontakt-E-Mail fuer Vorlagen ({{mitarbeiterEmail}})
+  emailAddress: z.string().email().max(255).nullable().optional().or(z.literal("")),
   fullName: z.string().min(1).max(200),
   firstName: z.string().max(100).nullable().optional(),
   lastName: z.string().max(100).nullable().optional(),
@@ -109,7 +112,8 @@ export const CreateUserSchema = z.object({
 });
 
 export const UpdateUserSchema = z.object({
-  email: z.string().email().optional(),
+  email: z.string().min(1).max(255).optional(),
+  emailAddress: z.string().email().max(255).nullable().optional().or(z.literal("")),
   fullName: z.string().min(1).max(200).optional(),
   firstName: z.string().max(100).nullable().optional(),
   lastName: z.string().max(100).nullable().optional(),

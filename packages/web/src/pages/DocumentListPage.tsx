@@ -10,6 +10,7 @@ import { Modal } from "@/components/ui/Modal";
 import { formatEur, DOCUMENT_TYPE_LABELS } from "@honeybill/shared";
 import type { DocumentType } from "@honeybill/shared";
 import { useCan } from "@/api/hooks/usePermissions";
+import { Label } from "@/components/ui/Label";
 
 const TYPES: DocumentType[] = ["INVOICE", "QUOTE", "CREDIT_NOTE", "DELIVERY_NOTE"];
 
@@ -202,7 +203,7 @@ function CreateDocumentModal({
           </select>
         </div>
         <div>
-          <label className="label">Kunde *</label>
+          <Label required>Kunde</Label>
           <select className="input" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
             <option value="">Kunde auswählen…</option>
             {(customersData?.data ?? []).map((c) => (

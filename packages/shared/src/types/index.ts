@@ -454,7 +454,10 @@ export interface CompanySettings {
 
 export interface User {
   id: number;
+  /** Login-Name (freier Text, nicht zwingend E-Mail-Format) */
   email: string;
+  /** Optionale Kontakt-E-Mail fuer Vorlagen ({{mitarbeiterEmail}}) */
+  emailAddress?: string | null;
   fullName: string;
   firstName: string | null;
   lastName: string | null;
