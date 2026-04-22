@@ -10,6 +10,7 @@ import { DecimalInput } from "@/components/ui/DecimalInput";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useCan } from "@/api/hooks/usePermissions";
+import { Label } from "@/components/ui/Label";
 
 interface Product {
   id: number;
@@ -158,11 +159,11 @@ function ProductForm({
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="label">SKU *</label>
+          <Label required>SKU</Label>
           <input {...field("sku")} required className="input" placeholder="DIENSTL-001" />
         </div>
         <div>
-          <label className="label">Name *</label>
+          <Label required>Name</Label>
           <input {...field("name")} required className="input" />
         </div>
         <div>
@@ -170,7 +171,7 @@ function ProductForm({
           <input {...field("unit")} className="input" placeholder="Stk, Std, kg…" />
         </div>
         <div>
-          <label className="label">Preis (netto, €) *</label>
+          <Label required>Preis (netto, €)</Label>
           <DecimalInput
             value={form.unitPrice}
             onChange={(v) => setForm((f) => ({ ...f, unitPrice: v }))}
@@ -180,7 +181,7 @@ function ProductForm({
           />
         </div>
         <div>
-          <label className="label">Steuersatz *</label>
+          <Label required>Steuersatz</Label>
           <select {...field("taxRateId")} required className="input">
             <option value="">Wählen…</option>
             {(taxRates ?? []).map((tr) => (
@@ -287,11 +288,11 @@ function EditProductModal({ product, onClose }: { product: Product; onClose: () 
       <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="label">SKU *</label>
+            <Label required>SKU</Label>
             <input {...field("sku")} required className="input" />
           </div>
           <div>
-            <label className="label">Name *</label>
+            <Label required>Name</Label>
             <input {...field("name")} required className="input" />
           </div>
           <div>
@@ -306,7 +307,7 @@ function EditProductModal({ product, onClose }: { product: Product; onClose: () 
             </p>
           </div>
           <div>
-            <label className="label">Steuersatz *</label>
+            <Label required>Steuersatz</Label>
             <select {...field("taxRateId")} required className="input">
               <option value="">Wählen…</option>
               {(taxRates ?? []).map((tr) => (
@@ -394,7 +395,7 @@ function EditProductModal({ product, onClose }: { product: Product; onClose: () 
               />
             </div>
             <div>
-              <label className="label">Gültig ab *</label>
+              <Label required>Gültig ab</Label>
               <input
                 type="date"
                 value={newPeriod.validFrom}

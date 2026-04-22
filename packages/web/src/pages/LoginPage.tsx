@@ -5,6 +5,7 @@ import { useLogin } from "@/api/hooks/useAuth";
 import { useNavigate } from "@tanstack/react-router";
 import { useAuthStore } from "@/stores/auth.store";
 import { useEffect } from "react";
+import { Label } from "@/components/ui/Label";
 
 const schema = z.object({
   email: z.string().min(1, "Benutzername erforderlich"),
@@ -43,7 +44,7 @@ export function LoginPage() {
         <div className="card p-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
-              <label className="label">Benutzername</label>
+              <Label required>Benutzername</Label>
               <input
                 {...register("email")}
                 type="text"
@@ -56,7 +57,7 @@ export function LoginPage() {
               )}
             </div>
             <div>
-              <label className="label">Passwort</label>
+              <Label required>Passwort</Label>
               <input
                 {...register("password")}
                 type="password"

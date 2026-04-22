@@ -7,6 +7,7 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
 import { DecimalInput } from "@/components/ui/DecimalInput";
 import { useCan } from "@/api/hooks/usePermissions";
+import { Label } from "@/components/ui/Label";
 
 const TAX_CATEGORIES = [
   { value: "S", label: "S – Normalsatz" },
@@ -231,7 +232,7 @@ function CreateTaxRateModal({ open, onClose, existing }: {
       <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
-            <label className="label">Bezeichnung *</label>
+            <Label required>Bezeichnung</Label>
             <input {...field("name")} required className="input" placeholder="z. B. Normalsatz 19%" />
           </div>
           {/* Im Bearbeiten-Modus: Satz und Gültig-ab als Nur-Lesen anzeigen */}
@@ -245,7 +246,7 @@ function CreateTaxRateModal({ open, onClose, existing }: {
                 </p>
               </div>
               <div>
-                <label className="label">Kategorie (EN 16931) *</label>
+                <Label required>Kategorie (EN 16931)</Label>
                 <select {...field("taxCategory")} className="input">
                   {TAX_CATEGORIES.map((c) => (
                     <option key={c.value} value={c.value}>{c.label}</option>
@@ -256,7 +257,7 @@ function CreateTaxRateModal({ open, onClose, existing }: {
           ) : (
             <>
               <div>
-                <label className="label">Steuersatz (%) *</label>
+                <Label required>Steuersatz (%)</Label>
                 <DecimalInput
                   value={String(form.ratePercent)}
                   onChange={(v) => setForm((f) => ({ ...f, ratePercent: v }))}
@@ -265,7 +266,7 @@ function CreateTaxRateModal({ open, onClose, existing }: {
                 />
               </div>
               <div>
-                <label className="label">Kategorie (EN 16931) *</label>
+                <Label required>Kategorie (EN 16931)</Label>
                 <select {...field("taxCategory")} className="input">
                   {TAX_CATEGORIES.map((c) => (
                     <option key={c.value} value={c.value}>{c.label}</option>
@@ -273,7 +274,7 @@ function CreateTaxRateModal({ open, onClose, existing }: {
                 </select>
               </div>
               <div>
-                <label className="label">Gültig ab *</label>
+                <Label required>Gültig ab</Label>
                 <input {...field("validFrom")} required type="date" className="input" />
               </div>
               <div>
@@ -370,7 +371,7 @@ function CreateTaxRateModal({ open, onClose, existing }: {
                 />
               </div>
               <div>
-                <label className="label">Gültig ab *</label>
+                <Label required>Gültig ab</Label>
                 <input
                   type="date"
                   value={newPeriod.validFrom}

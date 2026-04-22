@@ -66,7 +66,10 @@ export const auditLog = sqliteTable("audit_log", {
 
 export const users = sqliteTable("users", {
   id: int("id").primaryKey({ autoIncrement: true }),
+  // Login-Name — freier Text, muss eindeutig sein, kein E-Mail-Format erzwungen
   email: text("email").notNull().unique(),
+  // Optionale Kontakt-E-Mail fuer Vorlagen ({{mitarbeiterEmail}})
+  emailAddress: text("email_address"),
   passwordHash: text("password_hash").notNull(),
   fullName: text("full_name").notNull(),
   firstName: text("first_name"),

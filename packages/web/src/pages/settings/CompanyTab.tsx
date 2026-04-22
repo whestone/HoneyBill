@@ -7,6 +7,7 @@ import { UpdateCompanySettingsSchema, type UpdateCompanySettingsInput } from "@h
 import { useEffect, useRef, useState } from "react";
 import { Building2, CheckCircle } from "lucide-react";
 import { useCan } from "@/api/hooks/usePermissions";
+import { Label } from "@/components/ui/Label";
 
 export function CompanyTab() {
   const [saved, setSaved] = useState(false);
@@ -87,7 +88,7 @@ export function CompanyTab() {
         <fieldset disabled={!canEdit} className="space-y-4 disabled:opacity-60">
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
-            <label className="label">Firmenname *</label>
+            <Label required>Firmenname</Label>
             <input {...register("name")} required className="input" />
           </div>
           <div>
