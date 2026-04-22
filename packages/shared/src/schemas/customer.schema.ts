@@ -6,7 +6,10 @@ export const CreateCustomerSchema = z.object({
   salutation: z.enum(["Herr", "Frau", "Divers", ""]).nullable().optional(),
   firstName: z.string().max(100).nullable().optional(),
   lastName: z.string().max(100).nullable().optional(),
-  email: z.string().email().nullable().optional(),
+  email: z.preprocess(
+    (v) => (v === "" ? null : v),
+    z.string().email().nullable().optional(),
+  ),
   phone: z.string().max(50).nullable().optional(),
   billStreet: z.string().max(200).nullable().optional(),
   billZip: z.string().max(20).nullable().optional(),
