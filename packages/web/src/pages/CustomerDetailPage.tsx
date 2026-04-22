@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "@tanstack/react-router";
-import { useCustomer, useUpdateCustomer } from "@/api/hooks/useCustomers";
+import { useCustomer, useUpdateCustomer, useDeleteCustomer } from "@/api/hooks/useCustomers";
 import { useDocuments } from "@/api/hooks/useDocuments";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateCustomerSchema, type CreateCustomerInput, formatEur, DOCUMENT_TYPE_LABELS } from "@honeybill/shared";
-import { ArrowLeft, Building2, CheckCircle, FileText, User } from "lucide-react";
+import { ArrowLeft, Building2, CheckCircle, FileText, Trash2, User } from "lucide-react";
 import { StatusBadge, TypeBadge } from "@/components/ui/Badge";
 import type { DocumentType } from "@honeybill/shared";
 import { useCan } from "@/api/hooks/usePermissions";
 import { Label } from "@/components/ui/Label";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 export function CustomerDetailPage() {
   const { id } = useParams({ strict: false });
@@ -20,6 +21,8 @@ export function CustomerDetailPage() {
 
   const { data: customer, isLoading } = useCustomer(customerId);
   const update = useUpdateCustomer(customerId);
+  const del = useDeleteCustomer();
+  const confirm = useConfirm();
 
   const { data: docsData } = useDocuments({ customer: String(customerId), limit: "50" });
 
@@ -88,10 +91,30 @@ export function CustomerDetailPage() {
         >
           <ArrowLeft size={20} />
         </button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-xl font-bold text-gray-900">{displayName}</h1>
           <p className="text-sm text-gray-400 font-mono">{customer.customerNumber}</p>
         </div>
+        <button
+          type="button"
+          disabled={!canEdit || del.isPending}
+          onClick={async () => {
+            if (
+              await confirm(`Kunde „${displayName}" wirklich archivieren?`, {
+                title: "Kunde archivieren",
+                confirmLabel: "Archivieren",
+              })
+            ) {
+              del.mutate(customerId, {
+                onSuccess: () => navigate({ to: "/customers" }),
+              });
+            }
+          }}
+          className="btn-danger text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          title={canEdit ? "Kunde archivieren" : "Keine Schreibrechte"}
+        >
+          <Trash2 size={14} /> Löschen
+        </button>
       </div>
 
       {/* Quick stats */}
