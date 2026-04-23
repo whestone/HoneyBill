@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Plus, Search, Users } from "lucide-react";
-import { useCustomers, useCreateCustomer } from "@/api/hooks/useCustomers";
+import { ArchiveRestore, Plus, Search, Users } from "lucide-react";
+import { useCustomers, useCreateCustomer, useUpdateCustomer } from "@/api/hooks/useCustomers";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
@@ -25,10 +25,15 @@ export function CustomersPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const { can } = useCan();
   const canEdit = can("customers", "edit");
 
-  const { data, isLoading } = useCustomers({ q: search, page: String(page) });
+  const { data, isLoading } = useCustomers({
+    q: search,
+    page: String(page),
+    ...(showArchived ? { archived: "true" } : {}),
+  });
 
   return (
     <div className="p-6 space-y-4">
@@ -44,15 +49,25 @@ export function CustomersPage() {
         </button>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          className="input pl-9"
-          placeholder="Suche nach Name, Nummer, E-Mail…"
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-        />
+      {/* Search + Filter */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="relative max-w-sm flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            className="input pl-9 w-full"
+            placeholder="Suche nach Name, Nummer, E-Mail…"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          />
+        </div>
+        <label className="flex items-center gap-1.5 text-xs text-gray-500">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) => { setShowArchived(e.target.checked); setPage(1); }}
+          />
+          Archivierte anzeigen
+        </label>
       </div>
 
       {/* Table */}
@@ -85,6 +100,7 @@ export function CustomersPage() {
                 <th className="table-header text-right">Offen</th>
                 <th className="table-header text-right">Umsatz 365 T.</th>
                 <th className="table-header">USt-IdNr.</th>
+                {showArchived && <th className="table-header"></th>}
               </tr>
             </thead>
             <tbody>
@@ -114,6 +130,11 @@ export function CustomersPage() {
                       {rev > 0 ? formatEur(rev) : "—"}
                     </td>
                     <td className="table-cell text-gray-500 font-mono text-xs">{c.vatId ?? "—"}</td>
+                    {showArchived && (
+                      <td className="table-cell text-right">
+                        <RestoreButton id={c.id} disabled={!canEdit} />
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -129,6 +150,21 @@ export function CustomersPage() {
       {/* Create modal */}
       <CreateCustomerModal open={showCreate} onClose={() => setShowCreate(false)} />
     </div>
+  );
+}
+
+function RestoreButton({ id, disabled }: { id: number; disabled: boolean }) {
+  const update = useUpdateCustomer(id);
+  return (
+    <button
+      type="button"
+      disabled={disabled || update.isPending}
+      onClick={() => update.mutate({ isArchived: false })}
+      className="btn-secondary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+      title={disabled ? "Keine Schreibrechte" : "Archivierung aufheben"}
+    >
+      <ArchiveRestore size={12} /> Reaktivieren
+    </button>
   );
 }
 

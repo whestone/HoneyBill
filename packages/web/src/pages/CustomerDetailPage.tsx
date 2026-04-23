@@ -5,7 +5,7 @@ import { useDocuments } from "@/api/hooks/useDocuments";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateCustomerSchema, type CreateCustomerInput, formatEur, DOCUMENT_TYPE_LABELS } from "@honeybill/shared";
-import { ArrowLeft, Building2, CheckCircle, FileText, Trash2, User } from "lucide-react";
+import { Archive, ArrowLeft, Building2, CheckCircle, FileText, User } from "lucide-react";
 import { StatusBadge, TypeBadge } from "@/components/ui/Badge";
 import type { DocumentType } from "@honeybill/shared";
 import { useCan } from "@/api/hooks/usePermissions";
@@ -111,9 +111,9 @@ export function CustomerDetailPage() {
             }
           }}
           className="btn-danger text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-          title={canEdit ? "Kunde archivieren" : "Keine Schreibrechte"}
+          title={canEdit ? "Kunde archivieren (bleibt referenziert fuer GoBD)" : "Keine Schreibrechte"}
         >
-          <Trash2 size={14} /> Löschen
+          <Archive size={14} /> Archivieren
         </button>
       </div>
 

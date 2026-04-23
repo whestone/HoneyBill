@@ -33,7 +33,9 @@ export const CreateCustomerSchema = z.object({
   notes: z.string().max(5000).nullable().optional(),
 });
 
-export const UpdateCustomerSchema = CreateCustomerSchema.partial();
+export const UpdateCustomerSchema = CreateCustomerSchema.partial().extend({
+  isArchived: z.boolean().optional(),
+});
 
 export type CreateCustomerInput = z.infer<typeof CreateCustomerSchema>;
 export type UpdateCustomerInput = z.infer<typeof UpdateCustomerSchema>;
