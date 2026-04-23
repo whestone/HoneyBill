@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import type { TaxRate } from "@honeybill/shared";
 import { useState } from "react";
-import { Plus, Trash2, FileText, History } from "lucide-react";
+import { Plus, Trash2, Pencil, History } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
 import { DecimalInput } from "@/components/ui/DecimalInput";
@@ -110,7 +110,7 @@ export function TaxRatesTab() {
                         className="text-gray-300 hover:text-honey-600 transition-colors p-1 disabled:opacity-40 disabled:cursor-not-allowed"
                         title={canEdit ? "Bearbeiten" : "Keine Schreibrechte"}
                       >
-                        <FileText size={14} />
+                        <Pencil size={14} />
                       </button>
                       <button
                         onClick={async () => { if (await confirm(`Steuersatz "${tr.name}" löschen?`, { title: "Steuersatz löschen", confirmLabel: "Löschen" })) deleteTaxRate.mutate(tr.id); }}
