@@ -5,7 +5,7 @@ import { useDocuments } from "@/api/hooks/useDocuments";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateCustomerSchema, type CreateCustomerInput, formatEur, DOCUMENT_TYPE_LABELS } from "@honeybill/shared";
-import { Archive, ArrowLeft, Building2, CheckCircle, FileText, User } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeft, Building2, CheckCircle, FileText, User } from "lucide-react";
 import { StatusBadge, TypeBadge } from "@/components/ui/Badge";
 import type { DocumentType } from "@honeybill/shared";
 import { useCan } from "@/api/hooks/usePermissions";
@@ -95,26 +95,38 @@ export function CustomerDetailPage() {
           <h1 className="text-xl font-bold text-gray-900">{displayName}</h1>
           <p className="text-sm text-gray-400 font-mono">{customer.customerNumber}</p>
         </div>
-        <button
-          type="button"
-          disabled={!canEdit || del.isPending}
-          onClick={async () => {
-            if (
-              await confirm(`Kunde „${displayName}" wirklich archivieren?`, {
-                title: "Kunde archivieren",
-                confirmLabel: "Archivieren",
-              })
-            ) {
-              del.mutate(customerId, {
-                onSuccess: () => navigate({ to: "/customers" }),
-              });
-            }
-          }}
-          className="btn-danger text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-          title={canEdit ? "Kunde archivieren (bleibt referenziert fuer GoBD)" : "Keine Schreibrechte"}
-        >
-          <Archive size={14} /> Archivieren
-        </button>
+        {customer.isArchived ? (
+          <button
+            type="button"
+            disabled={!canEdit || update.isPending}
+            onClick={() => update.mutate({ isArchived: false })}
+            className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            title={canEdit ? "Archivierung aufheben" : "Keine Schreibrechte"}
+          >
+            <ArchiveRestore size={14} /> Reaktivieren
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={!canEdit || del.isPending}
+            onClick={async () => {
+              if (
+                await confirm(`Kunde „${displayName}" wirklich archivieren?`, {
+                  title: "Kunde archivieren",
+                  confirmLabel: "Archivieren",
+                })
+              ) {
+                del.mutate(customerId, {
+                  onSuccess: () => navigate({ to: "/customers" }),
+                });
+              }
+            }}
+            className="btn-danger text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            title={canEdit ? "Kunde archivieren (bleibt referenziert fuer GoBD)" : "Keine Schreibrechte"}
+          >
+            <Archive size={14} /> Archivieren
+          </button>
+        )}
       </div>
 
       {/* Quick stats */}
