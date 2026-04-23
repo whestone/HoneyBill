@@ -112,7 +112,15 @@ export function ProductsPage() {
               {data.data.map((p) => (
                 <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="table-cell font-mono text-xs">{p.sku}</td>
-                  <td className="table-cell font-medium">{p.name}</td>
+                  <td className="table-cell">
+                    <button
+                      type="button"
+                      onClick={() => setEditProduct(p as Product)}
+                      className="font-medium text-honey-600 hover:underline text-left"
+                    >
+                      {p.name}
+                    </button>
+                  </td>
                   <td className="table-cell text-gray-500">{p.unit}</td>
                   <td className="table-cell text-right">{formatEur(p.unitPrice)}</td>
                   <td className="table-cell text-right text-gray-500">
