@@ -10,7 +10,9 @@ export const CreateProductSchema = z.object({
   categoryId: z.number().int().positive().nullable().optional(),
 });
 
-export const UpdateProductSchema = CreateProductSchema.partial();
+export const UpdateProductSchema = CreateProductSchema.partial().extend({
+  isArchived: z.boolean().optional(),
+});
 
 export type CreateProductInput = z.infer<typeof CreateProductSchema>;
 export type UpdateProductInput = z.infer<typeof UpdateProductSchema>;
