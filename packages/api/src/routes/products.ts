@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { and, desc, eq, isNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, like, lte, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { productCategories, productPriceHistory, products } from "../db/schema.js";
 import { CreateProductSchema, UpdateProductSchema } from "@honeybill/shared";
@@ -15,6 +15,16 @@ export async function productRoutes(app: FastifyInstance) {
 
     const conditions: ReturnType<typeof eq>[] = [eq(products.isArchived, archived)];
     if (q.category) conditions.push(eq(products.categoryId, Number(q.category)));
+    if (q.q) {
+      const term = `%${q.q}%`;
+      conditions.push(
+        or(
+          like(products.name, term),
+          like(products.sku, term),
+          like(products.description, term),
+        )!,
+      );
+    }
 
     const [total, rows] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(products).where(and(...conditions))

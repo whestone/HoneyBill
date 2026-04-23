@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Archive, ArchiveRestore, Plus, Package, Pencil, Trash2, History } from "lucide-react";
+import { Archive, ArchiveRestore, Plus, Package, Pencil, Search, Trash2, History } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useProducts, useCreateProduct, useDeleteProduct, useUpdateProduct, useTaxRates } from "@/api/hooks/useProducts";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -32,11 +32,13 @@ interface PriceHistoryEntry {
 }
 
 export function ProductsPage() {
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const { data, isLoading } = useProducts({
+    q: search,
     page: String(page),
     ...(showArchived ? { archived: "true" } : {}),
   });
@@ -54,24 +56,35 @@ export function ProductsPage() {
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Produkte</h1>
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 text-xs text-gray-500">
-            <input
-              type="checkbox"
-              checked={showArchived}
-              onChange={(e) => { setShowArchived(e.target.checked); setPage(1); }}
-            />
-            Archivierte anzeigen
-          </label>
-          <button
-            onClick={() => setShowCreate(true)}
-            disabled={!canEdit}
-            className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            title={canEdit ? undefined : "Keine Schreibrechte"}
-          >
-            <Plus size={16} /> Neues Produkt
-          </button>
+        <button
+          onClick={() => setShowCreate(true)}
+          disabled={!canEdit}
+          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          title={canEdit ? undefined : "Keine Schreibrechte"}
+        >
+          <Plus size={16} /> Neues Produkt
+        </button>
+      </div>
+
+      {/* Search + Filter */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="relative max-w-sm flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            className="input pl-9 w-full"
+            placeholder="Suche nach Name, SKU, Beschreibung…"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          />
         </div>
+        <label className="flex items-center gap-1.5 text-xs text-gray-500">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) => { setShowArchived(e.target.checked); setPage(1); }}
+          />
+          Archivierte anzeigen
+        </label>
       </div>
 
       <div className="card overflow-hidden">

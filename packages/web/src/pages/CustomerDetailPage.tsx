@@ -95,37 +95,10 @@ export function CustomerDetailPage() {
           <h1 className="text-xl font-bold text-gray-900">{displayName}</h1>
           <p className="text-sm text-gray-400 font-mono">{customer.customerNumber}</p>
         </div>
-        {customer.isArchived ? (
-          <button
-            type="button"
-            disabled={!canEdit || update.isPending}
-            onClick={() => update.mutate({ isArchived: false })}
-            className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            title={canEdit ? "Archivierung aufheben" : "Keine Schreibrechte"}
-          >
-            <ArchiveRestore size={14} /> Reaktivieren
-          </button>
-        ) : (
-          <button
-            type="button"
-            disabled={!canEdit || del.isPending}
-            onClick={async () => {
-              if (
-                await confirm(`Kunde „${displayName}" wirklich archivieren?`, {
-                  title: "Kunde archivieren",
-                  confirmLabel: "Archivieren",
-                })
-              ) {
-                del.mutate(customerId, {
-                  onSuccess: () => navigate({ to: "/customers" }),
-                });
-              }
-            }}
-            className="btn-danger text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            title={canEdit ? "Kunde archivieren (bleibt referenziert fuer GoBD)" : "Keine Schreibrechte"}
-          >
-            <Archive size={14} /> Archivieren
-          </button>
+        {customer.isArchived && (
+          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs bg-gray-100 text-gray-500">
+            Archiviert
+          </span>
         )}
       </div>
 
@@ -292,14 +265,48 @@ export function CustomerDetailPage() {
             />
           </div>
 
-          <div className="flex items-center gap-3">
-            <button type="submit" disabled={update.isPending} className="btn-primary">
-              {update.isPending ? "Speichern…" : "Speichern"}
-            </button>
-            {saved && (
-              <span className="flex items-center gap-1 text-green-600 text-sm">
-                <CheckCircle size={14} /> Gespeichert
-              </span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button type="submit" disabled={update.isPending} className="btn-primary">
+                {update.isPending ? "Speichern…" : "Speichern"}
+              </button>
+              {saved && (
+                <span className="flex items-center gap-1 text-green-600 text-sm">
+                  <CheckCircle size={14} /> Gespeichert
+                </span>
+              )}
+            </div>
+            {customer.isArchived ? (
+              <button
+                type="button"
+                disabled={!canEdit || update.isPending}
+                onClick={() => update.mutate({ isArchived: false })}
+                className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                title={canEdit ? "Archivierung aufheben" : "Keine Schreibrechte"}
+              >
+                <ArchiveRestore size={14} /> Reaktivieren
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={!canEdit || del.isPending}
+                onClick={async () => {
+                  if (
+                    await confirm(`Kunde „${displayName}" wirklich archivieren?`, {
+                      title: "Kunde archivieren",
+                      confirmLabel: "Archivieren",
+                    })
+                  ) {
+                    del.mutate(customerId, {
+                      onSuccess: () => navigate({ to: "/customers" }),
+                    });
+                  }
+                }}
+                className="btn-danger text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                title={canEdit ? "Kunde archivieren (bleibt referenziert fuer GoBD)" : "Keine Schreibrechte"}
+              >
+                <Archive size={14} /> Archivieren
+              </button>
             )}
           </div>
           </fieldset>
