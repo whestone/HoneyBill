@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
-import type { Customer, CreateCustomerInput, PaginatedResponse } from "@honeybill/shared";
+import type { Customer, CreateCustomerInput, UpdateCustomerInput, PaginatedResponse } from "@honeybill/shared";
 
 export function useCustomers(params?: Record<string, string>) {
   const qs = new URLSearchParams(params ?? {}).toString();
@@ -29,7 +29,7 @@ export function useCreateCustomer() {
 export function useUpdateCustomer(id: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<CreateCustomerInput>) =>
+    mutationFn: (data: UpdateCustomerInput) =>
       api.put<Customer>(`/customers/${id}`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customers"] });
