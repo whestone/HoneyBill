@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Plus, Package, Pencil, Trash2, History } from "lucide-react";
+import { Archive, ArchiveRestore, Plus, Package, Pencil, Trash2, History } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { useProducts, useCreateProduct, useDeleteProduct, useTaxRates } from "@/api/hooks/useProducts";
+import { useProducts, useCreateProduct, useDeleteProduct, useUpdateProduct, useTaxRates } from "@/api/hooks/useProducts";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
@@ -34,15 +34,19 @@ interface PriceHistoryEntry {
 export function ProductsPage() {
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
-  const { data, isLoading } = useProducts({ page: String(page) });
+  const { data, isLoading } = useProducts({
+    page: String(page),
+    ...(showArchived ? { archived: "true" } : {}),
+  });
   const deleteProduct = useDeleteProduct();
   const confirm = useConfirm();
   const { can } = useCan();
   const canEdit = can("products", "edit");
 
-  const handleDelete = async (p: Product) => {
-    if (!await confirm(`Produkt "${p.name}" wirklich löschen?`, { title: "Produkt löschen" })) return;
+  const handleArchive = async (p: Product) => {
+    if (!await confirm(`Produkt „${p.name}" wirklich archivieren?`, { title: "Produkt archivieren", confirmLabel: "Archivieren" })) return;
     deleteProduct.mutate(p.id);
   };
 
@@ -50,14 +54,24 @@ export function ProductsPage() {
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Produkte</h1>
-        <button
-          onClick={() => setShowCreate(true)}
-          disabled={!canEdit}
-          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-          title={canEdit ? undefined : "Keine Schreibrechte"}
-        >
-          <Plus size={16} /> Neues Produkt
-        </button>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-xs text-gray-500">
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={(e) => { setShowArchived(e.target.checked); setPage(1); }}
+            />
+            Archivierte anzeigen
+          </label>
+          <button
+            onClick={() => setShowCreate(true)}
+            disabled={!canEdit}
+            className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            title={canEdit ? undefined : "Keine Schreibrechte"}
+          >
+            <Plus size={16} /> Neues Produkt
+          </button>
+        </div>
       </div>
 
       <div className="card overflow-hidden">
@@ -95,22 +109,28 @@ export function ProductsPage() {
                   </td>
                   <td className="table-cell">
                     <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => setEditProduct(p as Product)}
-                        disabled={!canEdit}
-                        className="p-1 text-gray-400 hover:text-honey-600 rounded disabled:opacity-40 disabled:cursor-not-allowed"
-                        title={canEdit ? "Bearbeiten" : "Keine Schreibrechte"}
-                      >
-                        <Pencil size={14} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(p as Product)}
-                        disabled={!canEdit}
-                        className="p-1 text-gray-400 hover:text-red-600 rounded disabled:opacity-40 disabled:cursor-not-allowed"
-                        title={canEdit ? "Löschen" : "Keine Schreibrechte"}
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      {showArchived ? (
+                        <RestoreProductButton id={p.id} disabled={!canEdit} />
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => setEditProduct(p as Product)}
+                            disabled={!canEdit}
+                            className="p-1 text-gray-400 hover:text-honey-600 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={canEdit ? "Bearbeiten" : "Keine Schreibrechte"}
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleArchive(p as Product)}
+                            disabled={!canEdit}
+                            className="p-1 text-gray-400 hover:text-red-600 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={canEdit ? "Archivieren" : "Keine Schreibrechte"}
+                          >
+                            <Archive size={14} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -130,6 +150,21 @@ export function ProductsPage() {
         />
       )}
     </div>
+  );
+}
+
+function RestoreProductButton({ id, disabled }: { id: number; disabled: boolean }) {
+  const update = useUpdateProduct(id);
+  return (
+    <button
+      type="button"
+      disabled={disabled || update.isPending}
+      onClick={() => update.mutate({ isArchived: false })}
+      className="btn-secondary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+      title={disabled ? "Keine Schreibrechte" : "Archivierung aufheben"}
+    >
+      <ArchiveRestore size={12} /> Reaktivieren
+    </button>
   );
 }
 
