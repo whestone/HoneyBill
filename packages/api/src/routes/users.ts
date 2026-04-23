@@ -35,6 +35,7 @@ export async function userRoutes(app: FastifyInstance) {
       .insert(users)
       .values({
         email: input.email,
+        emailAddress: input.emailAddress ? input.emailAddress : null,
         fullName: input.fullName,
         firstName: input.firstName ?? null,
         lastName: input.lastName ?? null,
@@ -73,6 +74,7 @@ export async function userRoutes(app: FastifyInstance) {
 
     const updateData: Record<string, unknown> = { updatedAt: new Date().toISOString() };
     if (input.email !== undefined) updateData.email = input.email;
+    if (input.emailAddress !== undefined) updateData.emailAddress = input.emailAddress ? input.emailAddress : null;
     if (input.fullName !== undefined) updateData.fullName = input.fullName;
     if (input.firstName !== undefined) updateData.firstName = input.firstName;
     if (input.lastName !== undefined) updateData.lastName = input.lastName;
