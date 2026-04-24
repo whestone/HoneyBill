@@ -6,7 +6,15 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
 import { Label } from "@/components/ui/Label";
 import { EmailInput, PhoneInput } from "@/components/ui/InputWithAction";
+import { useColumnVisibility, type ColumnDef } from "@/components/ui/ColumnToggle";
 import type { User, UserRole } from "@honeybill/shared";
+
+const USER_COLUMNS: ColumnDef[] = [
+  { key: "name", label: "Name / Benutzer", alwaysVisible: true },
+  { key: "role", label: "Rolle" },
+  { key: "status", label: "Status" },
+  { key: "lastLogin", label: "Letzter Login" },
+];
 
 const ROLE_LABELS: Record<UserRole, string> = {
   admin: "Administrator",
@@ -25,6 +33,7 @@ export function UsersTab({ currentUserId }: { currentUserId: number }) {
   const confirm = useConfirm();
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
+  const { isVisible, columnToggle } = useColumnVisibility("users", USER_COLUMNS);
 
   const { data: userList = [] } = useQuery<User[]>({
     queryKey: ["users"],
@@ -48,49 +57,60 @@ export function UsersTab({ currentUserId }: { currentUserId: number }) {
           <h2 className="text-sm font-semibold text-gray-900">Benutzer</h2>
           <p className="text-xs text-gray-400 mt-0.5">Zugänge verwalten und Rollen vergeben</p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="btn-primary text-sm">
-          <Plus size={14} /> Benutzer hinzufügen
-        </button>
+        <div className="flex items-center gap-2">
+          {columnToggle}
+          <button onClick={() => setShowCreate(true)} className="btn-primary text-sm">
+            <Plus size={14} /> Benutzer hinzufügen
+          </button>
+        </div>
       </div>
 
       <div className="card overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name / Benutzer</th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Rolle</th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Letzter Login</th>
+              {isVisible("name") && <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name / Benutzer</th>}
+              {isVisible("role") && <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Rolle</th>}
+              {isVisible("status") && <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>}
+              {isVisible("lastLogin") && <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Letzter Login</th>}
               <th className="px-4 py-2.5" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {userList.map((u) => (
               <tr key={u.id} className={`hover:bg-gray-50 transition-colors ${!u.isActive ? "opacity-50" : ""}`}>
-                <td className="px-4 py-3">
-                  <div className="font-medium text-gray-900">
-                    {u.firstName || u.lastName
-                      ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim()
-                      : u.fullName}
-                  </div>
-                  <div className="text-xs text-gray-400">{u.email}</div>
-                </td>
-                <td className="px-4 py-3">
-                  <span className="flex items-center gap-1.5">
-                    {ROLE_ICONS[u.role as UserRole]}
-                    {ROLE_LABELS[u.role as UserRole]}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                    u.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
-                  }`}>
-                    {u.isActive ? "Aktiv" : "Deaktiviert"}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-xs text-gray-400">
-                  {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString("de-DE") : "—"}
-                </td>
+                {isVisible("name") && (
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-gray-900">
+                      {u.firstName || u.lastName
+                        ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim()
+                        : u.fullName}
+                    </div>
+                    <div className="text-xs text-gray-400">{u.email}</div>
+                  </td>
+                )}
+                {isVisible("role") && (
+                  <td className="px-4 py-3">
+                    <span className="flex items-center gap-1.5">
+                      {ROLE_ICONS[u.role as UserRole]}
+                      {ROLE_LABELS[u.role as UserRole]}
+                    </span>
+                  </td>
+                )}
+                {isVisible("status") && (
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      u.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                    }`}>
+                      {u.isActive ? "Aktiv" : "Deaktiviert"}
+                    </span>
+                  </td>
+                )}
+                {isVisible("lastLogin") && (
+                  <td className="px-4 py-3 text-xs text-gray-400">
+                    {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString("de-DE") : "—"}
+                  </td>
+                )}
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1 justify-end">
                     <button
