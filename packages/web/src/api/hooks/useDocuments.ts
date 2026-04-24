@@ -92,7 +92,34 @@ export function useDeletePayment(docId: number) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["documents", docId] });
       qc.invalidateQueries({ queryKey: ["documents"] });
+      qc.invalidateQueries({ queryKey: ["audit-log"] });
     },
+  });
+}
+
+export interface AuditLogEntry {
+  id: number;
+  userId: number | null;
+  action: string;
+  entityType: string;
+  entityId: number | null;
+  oldData: string | null;
+  newData: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}
+
+/**
+ * Audit-Log-Einträge für eine Entity abrufen (z. B. alle Aktionen an einem Dokument).
+ * Nützlich u. a. zum Anzeigen gelöschter Zahlungen.
+ */
+export function useAuditLog(entity: string, entityId: number | null | undefined) {
+  return useQuery<{ data: AuditLogEntry[]; total: number; totalPages: number }>({
+    queryKey: ["audit-log", entity, entityId],
+    queryFn: () =>
+      api.get(`/audit-log?entity=${encodeURIComponent(entity)}&entityId=${entityId}&limit=100`),
+    enabled: !!entityId && entityId > 0,
   });
 }
 
