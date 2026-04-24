@@ -108,6 +108,9 @@ export interface AuditLogEntry {
   ipAddress: string | null;
   userAgent: string | null;
   createdAt: string;
+  /** Aus dem leftJoin users — kann null sein, wenn der User geloescht wurde. */
+  userFullName?: string | null;
+  userEmail?: string | null;
 }
 
 /**

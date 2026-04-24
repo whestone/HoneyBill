@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { auditLog } from "../db/schema.js";
+import { auditLog, users } from "../db/schema.js";
 import { verifyAuditChain } from "../services/audit.service.js";
 
 export async function auditLogRoutes(app: FastifyInstance) {
@@ -28,8 +28,24 @@ export async function auditLogRoutes(app: FastifyInstance) {
         .where(conditions.length ? and(...conditions) : undefined)
         .then((r) => r[0]?.count ?? 0),
       db
-        .select()
+        .select({
+          id: auditLog.id,
+          userId: auditLog.userId,
+          action: auditLog.action,
+          entityType: auditLog.entityType,
+          entityId: auditLog.entityId,
+          oldData: auditLog.oldData,
+          newData: auditLog.newData,
+          ipAddress: auditLog.ipAddress,
+          userAgent: auditLog.userAgent,
+          createdAt: auditLog.createdAt,
+          prevHash: auditLog.prevHash,
+          hash: auditLog.hash,
+          userFullName: users.fullName,
+          userEmail: users.email,
+        })
         .from(auditLog)
+        .leftJoin(users, eq(users.id, auditLog.userId))
         .where(conditions.length ? and(...conditions) : undefined)
         .orderBy(desc(auditLog.createdAt))
         .limit(limit)

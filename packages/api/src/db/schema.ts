@@ -361,6 +361,10 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
     fields: [payments.documentId],
     references: [documents.id],
   }),
+  creator: one(users, {
+    fields: [payments.createdBy],
+    references: [users.id],
+  }),
 }));
 
 export const documentFilesRelations = relations(documentFiles, ({ one }) => ({

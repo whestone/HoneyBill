@@ -376,6 +376,7 @@ export function DocumentDetailPage() {
                       <th className="table-header">Datum</th>
                       <th className="table-header">Methode</th>
                       <th className="table-header">Referenz</th>
+                      <th className="table-header">Erfasst von</th>
                       <th className="table-header text-right">Betrag</th>
                       <th className="table-header w-10"></th>
                     </tr>
@@ -390,6 +391,13 @@ export function DocumentDetailPage() {
                             : "—"}
                         </td>
                         <td className="table-cell text-gray-500 text-xs">{p.reference ?? "—"}</td>
+                        <td className="table-cell text-gray-500 text-xs">
+                          {(p as any).creator
+                            ? (p as any).creator.firstName || (p as any).creator.lastName
+                              ? `${(p as any).creator.firstName ?? ""} ${(p as any).creator.lastName ?? ""}`.trim()
+                              : (p as any).creator.fullName ?? (p as any).creator.email
+                            : "—"}
+                        </td>
                         <td className="table-cell text-right font-medium text-green-600">
                           {formatEur(p.amount)}
                         </td>
@@ -432,6 +440,7 @@ export function DocumentDetailPage() {
                         </Link>
                       </td>
                       <td className="table-cell text-gray-400 text-xs">Gutschrift</td>
+                      <td className="table-cell text-gray-400 text-xs">—</td>
                       <td className="table-cell text-right font-medium text-red-600">
                         −{formatEur(cn.totalGross)}
                       </td>
@@ -932,6 +941,7 @@ function DeletedPaymentsList({ entries }: { entries: AuditLogEntry[] }) {
           <thead>
             <tr className="border-t border-gray-100 bg-gray-50">
               <th className="table-header">Gelöscht am</th>
+              <th className="table-header">Gelöscht von</th>
               <th className="table-header">Datum</th>
               <th className="table-header">Methode</th>
               <th className="table-header">Referenz</th>
@@ -949,6 +959,9 @@ function DeletedPaymentsList({ entries }: { entries: AuditLogEntry[] }) {
                 <tr key={e.id} className="border-b border-gray-100 text-gray-500 line-through">
                   <td className="table-cell text-xs">
                     {e.createdAt?.slice(0, 16).replace("T", " ") ?? "—"}
+                  </td>
+                  <td className="table-cell text-xs">
+                    {e.userFullName ?? e.userEmail ?? (e.userId ? `#${e.userId}` : "—")}
                   </td>
                   <td className="table-cell text-xs">{old.paymentDate ?? "—"}</td>
                   <td className="table-cell text-xs">{method}</td>

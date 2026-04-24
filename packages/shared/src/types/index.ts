@@ -169,6 +169,14 @@ export interface Payment {
   notes: string | null;
   createdBy: number | null;
   createdAt: string;
+  /** Aus GET /documents/:id – gejoint, kann bei alten Einträgen fehlen. */
+  creator?: {
+    id: number;
+    fullName: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  } | null;
 }
 
 export interface DocumentFile {
