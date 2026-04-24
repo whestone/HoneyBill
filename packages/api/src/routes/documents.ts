@@ -127,7 +127,14 @@ export async function documentRoutes(app: FastifyInstance) {
         customer: true,
         lineItems: { orderBy: [documentLineItems.position] },
         taxLines: true,
-        payments: { orderBy: [desc(payments.paymentDate)] },
+        payments: {
+          orderBy: [desc(payments.paymentDate)],
+          with: {
+            creator: {
+              columns: { id: true, fullName: true, firstName: true, lastName: true, email: true },
+            },
+          },
+        },
         cancelsDocument: true,
       },
     });
