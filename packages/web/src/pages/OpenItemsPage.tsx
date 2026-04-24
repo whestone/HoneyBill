@@ -5,6 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { AlertTriangle, BarChart3 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 interface OpenItem {
   id: number;
@@ -38,7 +39,7 @@ export function OpenItemsPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Offene Posten</h1>
+      <PageHeader title="Offene Posten" icon={BarChart3} />
 
       {/* Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
