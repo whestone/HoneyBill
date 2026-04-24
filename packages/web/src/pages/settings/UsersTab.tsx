@@ -5,6 +5,7 @@ import { Plus, Eye, EyeOff, Users, ShieldCheck, UserCog, BadgeCheck } from "luci
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
 import { Label } from "@/components/ui/Label";
+import { EmailInput, PhoneInput } from "@/components/ui/InputWithAction";
 import type { User, UserRole } from "@honeybill/shared";
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -234,9 +235,7 @@ function UserFormModal({
         </div>
         <div>
           <label className="label">E-Mail-Adresse</label>
-          <input
-            className="input"
-            type="email"
+          <EmailInput
             autoComplete="email"
             placeholder="max@firma.de"
             value={form.emailAddress}
@@ -264,18 +263,14 @@ function UserFormModal({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">Telefon (Festnetz)</label>
-            <input
-              className="input"
-              type="tel"
+            <PhoneInput
               value={form.phone}
               onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
             />
           </div>
           <div>
             <label className="label">Mobilnummer</label>
-            <input
-              className="input"
-              type="tel"
+            <PhoneInput
               value={form.mobile}
               onChange={(e) => setForm((f) => ({ ...f, mobile: e.target.value }))}
             />

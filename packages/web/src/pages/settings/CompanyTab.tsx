@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { Building2, CheckCircle } from "lucide-react";
 import { useCan } from "@/api/hooks/usePermissions";
 import { Label } from "@/components/ui/Label";
+import { EmailInput, PhoneInput } from "@/components/ui/InputWithAction";
 
 export function CompanyTab() {
   const [saved, setSaved] = useState(false);
@@ -113,11 +114,11 @@ export function CompanyTab() {
           </div>
           <div>
             <label className="label">E-Mail</label>
-            <input {...register("email")} type="email" className="input" />
+            <EmailInput {...register("email")} />
           </div>
           <div>
             <label className="label">Telefon</label>
-            <input {...register("phone")} className="input" />
+            <PhoneInput {...register("phone")} />
           </div>
           <div>
             <label className="label">Website</label>

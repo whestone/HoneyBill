@@ -8,6 +8,7 @@ import {
 import { useEffect, useState } from "react";
 import { CheckCircle, Mail, Send, Eye, EyeOff } from "lucide-react";
 import { useCan } from "@/api/hooks/usePermissions";
+import { EmailInput } from "@/components/ui/InputWithAction";
 
 export function EmailTab() {
   const qc = useQueryClient();
@@ -147,7 +148,7 @@ export function EmailTab() {
             </div>
             <div>
               <label className="label">Absender-E-Mail</label>
-              <input type="email" value={settings.smtp?.fromAddress ?? ""} onChange={(e) => setSmtp("fromAddress", e.target.value)} className="input" />
+              <EmailInput value={settings.smtp?.fromAddress ?? ""} onChange={(e) => setSmtp("fromAddress", e.target.value)} />
             </div>
           </div>
 
