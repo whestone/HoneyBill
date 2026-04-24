@@ -15,6 +15,7 @@ import {
   recordPayment,
   updateDocument,
 } from "../services/document.service.js";
+import { appendAudit } from "../services/audit.service.js";
 import { generateZugferdXml, generateXRechnungXml } from "../services/einvoice/xrechnung.service.js";
 import { packageZugferdPdf } from "../services/einvoice/zugferd.service.js";
 import { db as rawDb } from "../db/index.js";
@@ -448,6 +449,12 @@ export async function documentRoutes(app: FastifyInstance) {
     const doc = await db.query.documents.findFirst({ where: eq(documents.id, Number(id)) });
     if (!doc) return reply.status(404).send({ message: "Beleg nicht gefunden" });
 
+    // Zahlung vorher laden, damit wir den alten Zustand GoBD-konform ins Audit-Log schreiben können.
+    const payment = await db.query.payments.findFirst({ where: eq(payments.id, Number(paymentId)) });
+    if (!payment) return reply.status(404).send({ message: "Zahlung nicht gefunden" });
+
+    const oldStatus = doc.status;
+
     await db.delete(payments).where(eq(payments.id, Number(paymentId)));
 
     // Recalculate document status
@@ -466,6 +473,28 @@ export async function documentRoutes(app: FastifyInstance) {
       newStatus = "SENT";
     }
     await db.update(documents).set({ status: newStatus, updatedAt: new Date().toISOString() }).where(eq(documents.id, Number(id)));
+
+    const authPayload = req.user as { sub: string };
+    await appendAudit({
+      userId: Number(authPayload.sub),
+      action: "payment_delete",
+      entityType: "document",
+      entityId: Number(id),
+      oldData: {
+        paymentId: payment.id,
+        amount: payment.amount,
+        paymentDate: payment.paymentDate,
+        paymentMethod: payment.paymentMethod ?? null,
+        reference: payment.reference ?? null,
+        docStatus: oldStatus,
+      },
+      newData: {
+        newStatus,
+        remainingTotalPaid: totalPaid.toFixed(2),
+      },
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"] ?? null,
+    });
 
     return reply.status(204).send();
   });

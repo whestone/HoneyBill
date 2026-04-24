@@ -29,7 +29,11 @@ async function request<T>(
 
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
 
-  if (res.status === 401) {
+  // 401 auf dem Login-Endpoint bedeutet "falsche Anmeldedaten" – NICHT weiterleiten,
+  // sondern Fehler normal durchreichen, damit die LoginPage ihn anzeigen kann.
+  const isLoginRequest = path === "/auth/login";
+
+  if (res.status === 401 && !isLoginRequest) {
     useAuthStore.getState().clearAuth();
     window.location.href = "/login";
     throw new ApiError(401, "Unauthorized");

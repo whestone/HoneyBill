@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "@tanstack/react-router";
 import {
   useDocument,
@@ -7,6 +7,7 @@ import {
   useCancelDocument,
   useDeleteDocument,
   useAddPayment,
+  useDeletePayment,
   useConvertToInvoice,
   useCreateCreditNote,
   useCreateDeliveryNote,
@@ -17,8 +18,8 @@ import { api } from "@/api/client";
 import { StatusBadge, TypeBadge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { PdfPreview } from "@/components/pdf/PdfPreview";
-import { formatEur, DOCUMENT_TYPE_LABELS, DEFAULT_EMAIL_SETTINGS } from "@honeybill/shared";
-import type { CompanySettings, Document, DocumentType, User } from "@honeybill/shared";
+import { formatEur, DOCUMENT_TYPE_LABELS, DEFAULT_EMAIL_SETTINGS, PAYMENT_METHOD_LABELS } from "@honeybill/shared";
+import type { CompanySettings, Document, DocumentType, PaymentMethod, User } from "@honeybill/shared";
 import { ArrowLeft, CheckCircle, Check, CreditCard, Edit2, FileText, Send, Truck, Trash2, X, XCircle, Mail } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { pdf } from "@react-pdf/renderer";
@@ -27,6 +28,7 @@ import { useForm, Controller } from "react-hook-form";
 import { DecimalInput } from "@/components/ui/DecimalInput";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreatePaymentSchema, type CreatePaymentInput } from "@honeybill/shared";
+import { useCan } from "@/api/hooks/usePermissions";
 
 export function DocumentDetailPage() {
   const { id } = useParams({ strict: false });
@@ -55,10 +57,12 @@ export function DocumentDetailPage() {
   });
 
   const confirm = useConfirm();
+  const { can } = useCan();
   const finalize = useFinalizeDocument();
   const send = useSendDocument();
   const cancel = useCancelDocument();
   const deleteDoc = useDeleteDocument();
+  const deletePayment = useDeletePayment(Number(id));
   const convertToInvoice = useConvertToInvoice();
   const createCreditNote = useCreateCreditNote();
   const createDeliveryNote = useCreateDeliveryNote();
@@ -78,7 +82,8 @@ export function DocumentDetailPage() {
   const canSend = doc.status === "FINAL";
   const canCancel = ["FINAL", "SENT", "PARTIAL"].includes(doc.status);
   const canDelete = doc.status === "DRAFT";
-  const canPay = ["FINAL", "SENT", "PARTIAL"].includes(doc.status) && doc.documentType === "INVOICE";
+  const canEditPayments = can("openItems", "edit");
+  const canPay = ["FINAL", "SENT", "PARTIAL"].includes(doc.status) && doc.documentType === "INVOICE" && canEditPayments;
   const canConvertToInvoice = ["FINAL", "SENT"].includes(doc.status) && doc.documentType === "QUOTE";
   const canCreateDeliveryNote = ["FINAL", "SENT"].includes(doc.status) && doc.documentType === "INVOICE";
   const canCreditNote = ["FINAL", "SENT", "PARTIAL"].includes(doc.status) && doc.documentType === "INVOICE";
@@ -368,16 +373,49 @@ export function DocumentDetailPage() {
                       <th className="table-header">Methode</th>
                       <th className="table-header">Referenz</th>
                       <th className="table-header text-right">Betrag</th>
+                      <th className="table-header w-10"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {(doc.payments ?? []).map((p) => (
                       <tr key={p.id} className="border-b border-gray-50">
                         <td className="table-cell">{p.paymentDate}</td>
-                        <td className="table-cell text-gray-500">{p.paymentMethod ?? "—"}</td>
+                        <td className="table-cell text-gray-500">
+                          {p.paymentMethod
+                            ? PAYMENT_METHOD_LABELS[p.paymentMethod as PaymentMethod] ?? p.paymentMethod
+                            : "—"}
+                        </td>
                         <td className="table-cell text-gray-500 text-xs">{p.reference ?? "—"}</td>
                         <td className="table-cell text-right font-medium text-green-600">
                           {formatEur(p.amount)}
+                        </td>
+                        <td className="table-cell text-right">
+                          {canEditPayments && (
+                            <button
+                              type="button"
+                              disabled={deletePayment.isPending}
+                              onClick={async () => {
+                                const ok = await confirm(
+                                  `Zahlung vom ${p.paymentDate} über ${formatEur(p.amount)} wirklich löschen?`,
+                                  {
+                                    title: "Zahlung löschen?",
+                                    confirmLabel: "Löschen",
+                                    danger: true,
+                                  },
+                                );
+                                if (!ok) return;
+                                try {
+                                  await deletePayment.mutateAsync(p.id);
+                                } catch (err) {
+                                  setActionError((err as Error).message);
+                                }
+                              }}
+                              className="inline-flex items-center justify-center text-gray-400 hover:text-red-600 disabled:opacity-50"
+                              title="Zahlung löschen"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -393,6 +431,7 @@ export function DocumentDetailPage() {
                       <td className="table-cell text-right font-medium text-red-600">
                         −{formatEur(cn.totalGross)}
                       </td>
+                      <td className="table-cell"></td>
                     </tr>
                   ))}
                   </tbody>
@@ -798,6 +837,19 @@ function AddPaymentModal({
       paymentMethod: "BANK_TRANSFER",
     },
   });
+
+  // Beim Öffnen des Modals Formular mit aktuellem Restbetrag neu initialisieren
+  // (z. B. nachdem eine Zahlung gelöscht wurde und sich der offene Betrag geändert hat).
+  useEffect(() => {
+    if (open) {
+      reset({
+        paymentDate: new Date().toISOString().slice(0, 10),
+        amount: openAmount > 0 ? openAmount.toFixed(2) : "0.00",
+        paymentMethod: "BANK_TRANSFER",
+        reference: "",
+      });
+    }
+  }, [open, openAmount, reset]);
 
   const onSubmit = (data: CreatePaymentInput) => {
     addPayment.mutate(data, { onSuccess: () => { reset(); onClose(); } });

@@ -10,6 +10,7 @@ import { StatusBadge, TypeBadge } from "@/components/ui/Badge";
 import type { DocumentType } from "@honeybill/shared";
 import { useCan } from "@/api/hooks/usePermissions";
 import { Label } from "@/components/ui/Label";
+import { EmailInput, PhoneInput } from "@/components/ui/InputWithAction";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 export function CustomerDetailPage() {
@@ -176,11 +177,11 @@ export function CustomerDetailPage() {
               </div>
               <div>
                 <Label>E-Mail</Label>
-                <input {...register("email")} type="email" className="input" />
+                <EmailInput {...register("email")} />
               </div>
               <div>
                 <Label>Telefon</Label>
-                <input {...register("phone")} className="input" />
+                <PhoneInput {...register("phone")} />
               </div>
               <div>
                 <Label>USt-IdNr.</Label>

@@ -84,6 +84,18 @@ export function useAddPayment(docId: number) {
   });
 }
 
+export function useDeletePayment(docId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (paymentId: number) =>
+      api.delete(`/documents/${docId}/payments/${paymentId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["documents", docId] });
+      qc.invalidateQueries({ queryKey: ["documents"] });
+    },
+  });
+}
+
 export function useConvertToInvoice() {
   const qc = useQueryClient();
   return useMutation({
