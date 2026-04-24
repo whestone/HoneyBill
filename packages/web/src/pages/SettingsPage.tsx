@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { Settings as SettingsIcon } from "lucide-react";
 import type { PermissionResource } from "@honeybill/shared";
 import { useCan } from "@/api/hooks/usePermissions";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { CompanyTab } from "./settings/CompanyTab";
 import { TaxRatesTab } from "./settings/TaxRatesTab";
 import { NumberSeriesTab } from "./settings/NumberSeriesTab";
@@ -51,7 +53,7 @@ export function SettingsPage() {
 
   return (
     <div className={`p-6 space-y-4 ${tab === "pdflayout" ? "max-w-6xl" : "max-w-3xl"}`} style={{ minWidth: 0 }}>
-      <h1 className="text-2xl font-bold text-gray-900">Einstellungen</h1>
+      <PageHeader title="Einstellungen" icon={SettingsIcon} />
 
       {/* Tab bar */}
       <div className="flex gap-1 border-b border-gray-200 flex-wrap">

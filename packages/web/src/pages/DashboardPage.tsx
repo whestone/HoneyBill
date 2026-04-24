@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { formatEur } from "@honeybill/shared";
-import { AlertTriangle, Clock, FileText, TrendingUp } from "lucide-react";
+import { AlertTriangle, Clock, FileText, LayoutDashboard, TrendingUp } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { StatusBadge, TypeBadge } from "@/components/ui/Badge";
+import { PageHeader } from "@/components/ui/PageHeader";
 import type { DocumentType } from "@honeybill/shared";
 
 interface OpenItemsSummary {
@@ -108,15 +109,16 @@ export function DashboardPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-500 text-sm mt-1">Überblick über Umsatz und offene Forderungen</p>
-        </div>
-        <Link to="/documents" className="btn-primary">
-          <FileText size={14} /> Neuer Beleg
-        </Link>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        subtitle="Überblick über Umsatz und offene Forderungen"
+        icon={LayoutDashboard}
+        action={
+          <Link to="/documents" className="btn-primary">
+            <FileText size={14} /> Neuer Beleg
+          </Link>
+        }
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
