@@ -49,6 +49,7 @@ export function LoginPage() {
                 {...register("email")}
                 type="text"
                 autoComplete="username"
+                autoFocus
                 className="input"
                 placeholder="admin"
               />

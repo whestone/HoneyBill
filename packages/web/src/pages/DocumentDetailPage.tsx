@@ -12,6 +12,8 @@ import {
   useCreateCreditNote,
   useCreateDeliveryNote,
   useRelatedDocuments,
+  useAuditLog,
+  type AuditLogEntry,
 } from "@/api/hooks/useDocuments";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
@@ -63,6 +65,8 @@ export function DocumentDetailPage() {
   const cancel = useCancelDocument();
   const deleteDoc = useDeleteDocument();
   const deletePayment = useDeletePayment(Number(id));
+  const { data: auditData } = useAuditLog("document", Number(id));
+  const deletedPayments = (auditData?.data ?? []).filter((e) => e.action === "payment_delete");
   const convertToInvoice = useConvertToInvoice();
   const createCreditNote = useCreateCreditNote();
   const createDeliveryNote = useCreateDeliveryNote();
@@ -436,6 +440,9 @@ export function DocumentDetailPage() {
                   ))}
                   </tbody>
                 </table>
+              )}
+              {deletedPayments.length > 0 && (
+                <DeletedPaymentsList entries={deletedPayments} />
               )}
             </div>
           )}
@@ -897,5 +904,64 @@ function AddPaymentModal({
         </div>
       </form>
     </Modal>
+  );
+}
+
+/**
+ * Zeigt gelöschte Zahlungen als kollapsiblen Block unter der Zahlungstabelle.
+ * Quelle: Audit-Log (entity=document, action=payment_delete).
+ */
+function DeletedPaymentsList({ entries }: { entries: AuditLogEntry[] }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="border-t border-gray-100 bg-gray-50/50">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full px-4 py-2 text-xs text-gray-500 hover:text-gray-800 flex items-center justify-between"
+      >
+        <span className="flex items-center gap-1.5">
+          <Trash2 size={12} />
+          {entries.length} gelöschte {entries.length === 1 ? "Zahlung" : "Zahlungen"}
+        </span>
+        <span className="text-gray-400">{open ? "▾" : "▸"}</span>
+      </button>
+      {open && (
+        <table className="w-full">
+          <thead>
+            <tr className="border-t border-gray-100 bg-gray-50">
+              <th className="table-header">Gelöscht am</th>
+              <th className="table-header">Datum</th>
+              <th className="table-header">Methode</th>
+              <th className="table-header">Referenz</th>
+              <th className="table-header text-right">Betrag</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((e) => {
+              let old: any = {};
+              try { old = e.oldData ? JSON.parse(e.oldData) : {}; } catch { /* ignore */ }
+              const method = old.paymentMethod
+                ? PAYMENT_METHOD_LABELS[old.paymentMethod as PaymentMethod] ?? old.paymentMethod
+                : "—";
+              return (
+                <tr key={e.id} className="border-b border-gray-100 text-gray-500 line-through">
+                  <td className="table-cell text-xs">
+                    {e.createdAt?.slice(0, 16).replace("T", " ") ?? "—"}
+                  </td>
+                  <td className="table-cell text-xs">{old.paymentDate ?? "—"}</td>
+                  <td className="table-cell text-xs">{method}</td>
+                  <td className="table-cell text-xs">{old.reference ?? "—"}</td>
+                  <td className="table-cell text-right font-medium text-xs">
+                    {old.amount ? formatEur(String(old.amount)) : "—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
   );
 }
