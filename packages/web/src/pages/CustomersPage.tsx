@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArchiveRestore, Plus, Search, Users } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { useCustomers, useCreateCustomer, useUpdateCustomer } from "@/api/hooks/useCustomers";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Pagination } from "@/components/ui/Pagination";
@@ -11,6 +11,20 @@ import { CreateCustomerSchema, type CreateCustomerInput } from "@honeybill/share
 import { useCan } from "@/api/hooks/usePermissions";
 import { Label } from "@/components/ui/Label";
 import { EmailInput, PhoneInput } from "@/components/ui/InputWithAction";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SearchToolbar, FilterCheckbox } from "@/components/ui/SearchToolbar";
+import { RestoreButton as SharedRestoreButton } from "@/components/ui/ArchiveButton";
+import { useColumnVisibility, type ColumnDef } from "@/components/ui/ColumnToggle";
+
+const CUSTOMER_COLUMNS: ColumnDef[] = [
+  { key: "customerNumber", label: "Kundennr." },
+  { key: "name", label: "Name", alwaysVisible: true },
+  { key: "email", label: "E-Mail" },
+  { key: "city", label: "Ort" },
+  { key: "openAmount", label: "Offen" },
+  { key: "revenue365", label: "Umsatz 365 T." },
+  { key: "vatId", label: "USt-IdNr." },
+];
 
 const EUR_FMT = new Intl.NumberFormat("de-DE", {
   style: "currency",
@@ -29,6 +43,7 @@ export function CustomersPage() {
   const [showArchived, setShowArchived] = useState(false);
   const { can } = useCan();
   const canEdit = can("customers", "edit");
+  const { isVisible, columnToggle } = useColumnVisibility("customers", CUSTOMER_COLUMNS);
 
   const { data, isLoading } = useCustomers({
     q: search,
@@ -38,38 +53,33 @@ export function CustomersPage() {
 
   return (
     <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Kunden</h1>
-        <button
-          onClick={() => setShowCreate(true)}
-          disabled={!canEdit}
-          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-          title={canEdit ? undefined : "Keine Schreibrechte"}
-        >
-          <Plus size={16} /> Neuer Kunde
-        </button>
-      </div>
+      <PageHeader
+        title="Kunden"
+        icon={Users}
+        action={
+          <button
+            onClick={() => setShowCreate(true)}
+            disabled={!canEdit}
+            className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            title={canEdit ? undefined : "Keine Schreibrechte"}
+          >
+            <Plus size={16} /> Neuer Kunde
+          </button>
+        }
+      />
 
-      {/* Search + Filter */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative max-w-sm flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            className="input pl-9 w-full"
-            placeholder="Suche nach Name, Nummer, E-Mail…"
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          />
-        </div>
-        <label className="flex items-center gap-1.5 text-xs text-gray-500">
-          <input
-            type="checkbox"
-            checked={showArchived}
-            onChange={(e) => { setShowArchived(e.target.checked); setPage(1); }}
-          />
-          Archivierte anzeigen
-        </label>
-      </div>
+      <SearchToolbar
+        value={search}
+        onChange={(v) => { setSearch(v); setPage(1); }}
+        placeholder="Suche nach Name, Nummer, E-Mail…"
+        trailing={columnToggle}
+      >
+        <FilterCheckbox
+          label="Archivierte anzeigen"
+          checked={showArchived}
+          onChange={(v) => { setShowArchived(v); setPage(1); }}
+        />
+      </SearchToolbar>
 
       {/* Table */}
       <div className="card overflow-hidden">
@@ -94,13 +104,13 @@ export function CustomersPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100">
-                <th className="table-header">Kundennr.</th>
-                <th className="table-header">Name</th>
-                <th className="table-header">E-Mail</th>
-                <th className="table-header">Ort</th>
-                <th className="table-header text-right">Offen</th>
-                <th className="table-header text-right">Umsatz 365 T.</th>
-                <th className="table-header">USt-IdNr.</th>
+                {isVisible("customerNumber") && <th className="table-header">Kundennr.</th>}
+                {isVisible("name") && <th className="table-header">Name</th>}
+                {isVisible("email") && <th className="table-header">E-Mail</th>}
+                {isVisible("city") && <th className="table-header">Ort</th>}
+                {isVisible("openAmount") && <th className="table-header text-right">Offen</th>}
+                {isVisible("revenue365") && <th className="table-header text-right">Umsatz 365 T.</th>}
+                {isVisible("vatId") && <th className="table-header">USt-IdNr.</th>}
                 {showArchived && <th className="table-header"></th>}
               </tr>
             </thead>
@@ -110,27 +120,41 @@ export function CustomersPage() {
                 const rev = Number(c.revenue365 ?? "0");
                 return (
                   <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="table-cell font-mono text-xs">{c.customerNumber}</td>
-                    <td className="table-cell">
-                      <Link
-                        to="/customers/$id"
-                        params={{ id: String(c.id) }}
-                        className="font-medium text-honey-600 hover:underline"
-                      >
-                        {c.companyName ||
-                          `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim() ||
-                          "—"}
-                      </Link>
-                    </td>
-                    <td className="table-cell text-gray-500">{c.email ?? "—"}</td>
-                    <td className="table-cell text-gray-500">{c.billCity ?? "—"}</td>
-                    <td className={`table-cell text-right tabular-nums ${open > 0 ? "text-red-600 font-medium" : "text-gray-400"}`}>
-                      {open > 0 ? formatEur(open) : "—"}
-                    </td>
-                    <td className="table-cell text-right tabular-nums text-gray-700">
-                      {rev > 0 ? formatEur(rev) : "—"}
-                    </td>
-                    <td className="table-cell text-gray-500 font-mono text-xs">{c.vatId ?? "—"}</td>
+                    {isVisible("customerNumber") && (
+                      <td className="table-cell font-mono text-xs">{c.customerNumber}</td>
+                    )}
+                    {isVisible("name") && (
+                      <td className="table-cell">
+                        <Link
+                          to="/customers/$id"
+                          params={{ id: String(c.id) }}
+                          className="font-medium text-honey-600 hover:underline"
+                        >
+                          {c.companyName ||
+                            `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim() ||
+                            "—"}
+                        </Link>
+                      </td>
+                    )}
+                    {isVisible("email") && (
+                      <td className="table-cell text-gray-500">{c.email ?? "—"}</td>
+                    )}
+                    {isVisible("city") && (
+                      <td className="table-cell text-gray-500">{c.billCity ?? "—"}</td>
+                    )}
+                    {isVisible("openAmount") && (
+                      <td className={`table-cell text-right tabular-nums ${open > 0 ? "text-red-600 font-medium" : "text-gray-400"}`}>
+                        {open > 0 ? formatEur(open) : "—"}
+                      </td>
+                    )}
+                    {isVisible("revenue365") && (
+                      <td className="table-cell text-right tabular-nums text-gray-700">
+                        {rev > 0 ? formatEur(rev) : "—"}
+                      </td>
+                    )}
+                    {isVisible("vatId") && (
+                      <td className="table-cell text-gray-500 font-mono text-xs">{c.vatId ?? "—"}</td>
+                    )}
                     {showArchived && (
                       <td className="table-cell text-right">
                         <RestoreButton id={c.id} disabled={!canEdit} />
@@ -157,15 +181,11 @@ export function CustomersPage() {
 function RestoreButton({ id, disabled }: { id: number; disabled: boolean }) {
   const update = useUpdateCustomer(id);
   return (
-    <button
-      type="button"
-      disabled={disabled || update.isPending}
-      onClick={() => update.mutate({ isArchived: false })}
-      className="btn-secondary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-      title={disabled ? "Keine Schreibrechte" : "Archivierung aufheben"}
-    >
-      <ArchiveRestore size={12} /> Reaktivieren
-    </button>
+    <SharedRestoreButton
+      disabled={disabled}
+      loading={update.isPending}
+      onConfirm={() => update.mutateAsync({ isArchived: false })}
+    />
   );
 }
 

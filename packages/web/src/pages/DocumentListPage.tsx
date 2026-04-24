@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { FileText, Plus, Search } from "lucide-react";
-import { useDocuments, useCreateDocument, useDeleteDocument } from "@/api/hooks/useDocuments";
+import { FileText, Plus } from "lucide-react";
+import { useDocuments, useCreateDocument } from "@/api/hooks/useDocuments";
 import { useCustomers } from "@/api/hooks/useCustomers";
 import { StatusBadge, TypeBadge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -11,8 +11,20 @@ import { formatEur, DOCUMENT_TYPE_LABELS } from "@honeybill/shared";
 import type { DocumentType } from "@honeybill/shared";
 import { useCan } from "@/api/hooks/usePermissions";
 import { Label } from "@/components/ui/Label";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SearchToolbar } from "@/components/ui/SearchToolbar";
+import { useColumnVisibility, type ColumnDef } from "@/components/ui/ColumnToggle";
 
 const TYPES: DocumentType[] = ["INVOICE", "QUOTE", "CREDIT_NOTE", "DELIVERY_NOTE"];
+
+const DOCUMENT_COLUMNS: ColumnDef[] = [
+  { key: "number", label: "Nummer", alwaysVisible: true },
+  { key: "type", label: "Typ" },
+  { key: "status", label: "Status" },
+  { key: "customer", label: "Kunde" },
+  { key: "date", label: "Datum" },
+  { key: "total", label: "Betrag" },
+];
 
 export function DocumentListPage() {
   const navigate = useNavigate();
@@ -28,37 +40,35 @@ export function DocumentListPage() {
   if (searchQuery) params["q"] = searchQuery;
 
   const { data, isLoading } = useDocuments(params);
-  const deleteDoc = useDeleteDocument();
   const { can } = useCan();
   const canEdit = can("documents", "edit");
+  const { isVisible, columnToggle } = useColumnVisibility("documents", DOCUMENT_COLUMNS);
 
   return (
     <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Belege</h1>
-        <button
-          onClick={() => setShowCreate(true)}
-          disabled={!canEdit}
-          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-          title={canEdit ? undefined : "Keine Schreibrechte"}
-        >
-          <Plus size={16} /> Neuer Beleg
-        </button>
-      </div>
+      <PageHeader
+        title="Belege"
+        icon={FileText}
+        action={
+          <button
+            onClick={() => setShowCreate(true)}
+            disabled={!canEdit}
+            className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            title={canEdit ? undefined : "Keine Schreibrechte"}
+          >
+            <Plus size={16} /> Neuer Beleg
+          </button>
+        }
+      />
 
-      {/* Filters */}
-      <div className="flex gap-3 flex-wrap">
-        <div className="relative">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            className="input pl-8 w-48"
-            placeholder="Belegnummer suchen…"
-            value={searchQuery}
-            onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-          />
-        </div>
+      <SearchToolbar
+        value={searchQuery}
+        onChange={(v) => { setSearchQuery(v); setPage(1); }}
+        placeholder="Belegnummer suchen…"
+        trailing={columnToggle}
+      >
         <select
-          className="input w-auto"
+          className="input w-auto text-sm"
           value={typeFilter}
           onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
         >
@@ -68,7 +78,7 @@ export function DocumentListPage() {
           ))}
         </select>
         <select
-          className="input w-auto"
+          className="input w-auto text-sm"
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
         >
@@ -80,7 +90,7 @@ export function DocumentListPage() {
           <option value="PARTIAL">Teilbezahlt</option>
           <option value="CANCELLED">Storniert</option>
         </select>
-      </div>
+      </SearchToolbar>
 
       {/* Table */}
       <div className="card overflow-hidden">
@@ -105,12 +115,12 @@ export function DocumentListPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100">
-                <th className="table-header">Nummer</th>
-                <th className="table-header">Typ</th>
-                <th className="table-header">Status</th>
-                <th className="table-header">Kunde</th>
-                <th className="table-header">Datum</th>
-                <th className="table-header text-right">Betrag</th>
+                {isVisible("number") && <th className="table-header">Nummer</th>}
+                {isVisible("type") && <th className="table-header">Typ</th>}
+                {isVisible("status") && <th className="table-header">Status</th>}
+                {isVisible("customer") && <th className="table-header">Kunde</th>}
+                {isVisible("date") && <th className="table-header">Datum</th>}
+                {isVisible("total") && <th className="table-header text-right">Betrag</th>}
               </tr>
             </thead>
             <tbody>
@@ -122,28 +132,40 @@ export function DocumentListPage() {
                   "—";
                 return (
                   <tr key={doc.id} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="table-cell">
-                      <Link
-                        to={doc.status === "DRAFT" ? "/documents/$id/edit" : "/documents/$id"}
-                        params={{ id: String(doc.id) }}
-                        className="font-medium text-honey-600 hover:underline font-mono text-xs"
-                      >
-                        {doc.documentNumber ?? "(Entwurf)"}
-                      </Link>
-                    </td>
-                    <td className="table-cell">
-                      <TypeBadge type={doc.documentType as DocumentType} />
-                    </td>
-                    <td className="table-cell">
-                      <StatusBadge status={doc.status as any} />
-                    </td>
-                    <td className="table-cell text-gray-600">{customerName}</td>
-                    <td className="table-cell text-gray-500 text-xs">
-                      {doc.issueDate ?? doc.createdAt.slice(0, 10)}
-                    </td>
-                    <td className="table-cell text-right font-medium">
-                      {formatEur(doc.totalGross)}
-                    </td>
+                    {isVisible("number") && (
+                      <td className="table-cell">
+                        <Link
+                          to={doc.status === "DRAFT" ? "/documents/$id/edit" : "/documents/$id"}
+                          params={{ id: String(doc.id) }}
+                          className="font-medium text-honey-600 hover:underline font-mono text-xs"
+                        >
+                          {doc.documentNumber ?? "(Entwurf)"}
+                        </Link>
+                      </td>
+                    )}
+                    {isVisible("type") && (
+                      <td className="table-cell">
+                        <TypeBadge type={doc.documentType as DocumentType} />
+                      </td>
+                    )}
+                    {isVisible("status") && (
+                      <td className="table-cell">
+                        <StatusBadge status={doc.status as any} />
+                      </td>
+                    )}
+                    {isVisible("customer") && (
+                      <td className="table-cell text-gray-600">{customerName}</td>
+                    )}
+                    {isVisible("date") && (
+                      <td className="table-cell text-gray-500 text-xs">
+                        {doc.issueDate ?? doc.createdAt.slice(0, 10)}
+                      </td>
+                    )}
+                    {isVisible("total") && (
+                      <td className="table-cell text-right font-medium">
+                        {formatEur(doc.totalGross)}
+                      </td>
+                    )}
                   </tr>
                 );
               })}

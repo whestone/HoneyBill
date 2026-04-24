@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Archive, ArchiveRestore, Plus, Package, Pencil, Search, Trash2, History } from "lucide-react";
-import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { Plus, Package, Pencil, Trash2, History } from "lucide-react";
 import { useProducts, useCreateProduct, useDeleteProduct, useUpdateProduct, useTaxRates } from "@/api/hooks/useProducts";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Pagination } from "@/components/ui/Pagination";
@@ -11,6 +10,19 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useCan } from "@/api/hooks/usePermissions";
 import { Label } from "@/components/ui/Label";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SearchToolbar, FilterCheckbox } from "@/components/ui/SearchToolbar";
+import { IconButton } from "@/components/ui/IconButton";
+import { ArchiveButton, RestoreButton as SharedRestoreButton } from "@/components/ui/ArchiveButton";
+import { useColumnVisibility, type ColumnDef } from "@/components/ui/ColumnToggle";
+
+const PRODUCT_COLUMNS: ColumnDef[] = [
+  { key: "sku", label: "SKU" },
+  { key: "name", label: "Name", alwaysVisible: true },
+  { key: "unit", label: "Einheit" },
+  { key: "unitPrice", label: "Preis (netto)" },
+  { key: "taxRate", label: "MwSt." },
+];
 
 interface Product {
   id: number;
@@ -43,49 +55,39 @@ export function ProductsPage() {
     ...(showArchived ? { archived: "true" } : {}),
   });
   const deleteProduct = useDeleteProduct();
-  const confirm = useConfirm();
   const { can } = useCan();
   const canEdit = can("products", "edit");
-
-  const handleArchive = async (p: Product) => {
-    if (!await confirm(`Produkt „${p.name}" wirklich archivieren?`, { title: "Produkt archivieren", confirmLabel: "Archivieren" })) return;
-    deleteProduct.mutate(p.id);
-  };
+  const { isVisible, columnToggle } = useColumnVisibility("products", PRODUCT_COLUMNS);
 
   return (
     <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Produkte</h1>
-        <button
-          onClick={() => setShowCreate(true)}
-          disabled={!canEdit}
-          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-          title={canEdit ? undefined : "Keine Schreibrechte"}
-        >
-          <Plus size={16} /> Neues Produkt
-        </button>
-      </div>
+      <PageHeader
+        title="Produkte"
+        icon={Package}
+        action={
+          <button
+            onClick={() => setShowCreate(true)}
+            disabled={!canEdit}
+            className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            title={canEdit ? undefined : "Keine Schreibrechte"}
+          >
+            <Plus size={16} /> Neues Produkt
+          </button>
+        }
+      />
 
-      {/* Search + Filter */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative max-w-sm flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            className="input pl-9 w-full"
-            placeholder="Suche nach Name, SKU, Beschreibung…"
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          />
-        </div>
-        <label className="flex items-center gap-1.5 text-xs text-gray-500">
-          <input
-            type="checkbox"
-            checked={showArchived}
-            onChange={(e) => { setShowArchived(e.target.checked); setPage(1); }}
-          />
-          Archivierte anzeigen
-        </label>
-      </div>
+      <SearchToolbar
+        value={search}
+        onChange={(v) => { setSearch(v); setPage(1); }}
+        placeholder="Suche nach Name, SKU, Beschreibung…"
+        trailing={columnToggle}
+      >
+        <FilterCheckbox
+          label="Archivierte anzeigen"
+          checked={showArchived}
+          onChange={(v) => { setShowArchived(v); setPage(1); }}
+        />
+      </SearchToolbar>
 
       <div className="card overflow-hidden">
         {isLoading ? (
@@ -100,56 +102,64 @@ export function ProductsPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100">
-                <th className="table-header">SKU</th>
-                <th className="table-header">Name</th>
-                <th className="table-header">Einheit</th>
-                <th className="table-header text-right">Preis (netto)</th>
-                <th className="table-header text-right">MwSt.</th>
-                <th className="table-header w-20"></th>
+                {isVisible("sku") && <th className="table-header">SKU</th>}
+                {isVisible("name") && <th className="table-header">Name</th>}
+                {isVisible("unit") && <th className="table-header">Einheit</th>}
+                {isVisible("unitPrice") && <th className="table-header text-right">Preis (netto)</th>}
+                {isVisible("taxRate") && <th className="table-header text-right">MwSt.</th>}
+                <th className="table-header w-24"></th>
               </tr>
             </thead>
             <tbody>
               {data.data.map((p) => (
                 <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="table-cell font-mono text-xs">{p.sku}</td>
-                  <td className="table-cell">
-                    <button
-                      type="button"
-                      onClick={() => setEditProduct(p as Product)}
-                      className="font-medium text-honey-600 hover:underline text-left"
-                    >
-                      {p.name}
-                    </button>
-                  </td>
-                  <td className="table-cell text-gray-500">{p.unit}</td>
-                  <td className="table-cell text-right">{formatEur(p.unitPrice)}</td>
-                  <td className="table-cell text-right text-gray-500">
-                    {(p as any).taxRate
-                      ? `${parseFloat((p as any).taxRate.ratePercent).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} %`
-                      : "—"}
-                  </td>
+                  {isVisible("sku") && (
+                    <td className="table-cell font-mono text-xs">{p.sku}</td>
+                  )}
+                  {isVisible("name") && (
+                    <td className="table-cell">
+                      <button
+                        type="button"
+                        onClick={() => setEditProduct(p as Product)}
+                        className="font-medium text-honey-600 hover:underline text-left"
+                      >
+                        {p.name}
+                      </button>
+                    </td>
+                  )}
+                  {isVisible("unit") && (
+                    <td className="table-cell text-gray-500">{p.unit}</td>
+                  )}
+                  {isVisible("unitPrice") && (
+                    <td className="table-cell text-right">{formatEur(p.unitPrice)}</td>
+                  )}
+                  {isVisible("taxRate") && (
+                    <td className="table-cell text-right text-gray-500">
+                      {(p as any).taxRate
+                        ? `${parseFloat((p as any).taxRate.ratePercent).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} %`
+                        : "—"}
+                    </td>
+                  )}
                   <td className="table-cell">
                     <div className="flex items-center justify-end gap-1">
                       {showArchived ? (
                         <RestoreProductButton id={p.id} disabled={!canEdit} />
                       ) : (
                         <>
-                          <button
+                          <IconButton
+                            icon={Pencil}
+                            label="Bearbeiten"
+                            variant="primary"
                             onClick={() => setEditProduct(p as Product)}
                             disabled={!canEdit}
-                            className="p-1 text-gray-400 hover:text-honey-600 rounded disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={canEdit ? "Bearbeiten" : "Keine Schreibrechte"}
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleArchive(p as Product)}
+                          />
+                          <ArchiveButton
+                            compact
+                            itemLabel={p.name}
+                            onConfirm={() => deleteProduct.mutateAsync(p.id)}
                             disabled={!canEdit}
-                            className="p-1 text-gray-400 hover:text-red-600 rounded disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={canEdit ? "Archivieren" : "Keine Schreibrechte"}
-                          >
-                            <Archive size={14} />
-                          </button>
+                            loading={deleteProduct.isPending}
+                          />
                         </>
                       )}
                     </div>
@@ -177,15 +187,12 @@ export function ProductsPage() {
 function RestoreProductButton({ id, disabled }: { id: number; disabled: boolean }) {
   const update = useUpdateProduct(id);
   return (
-    <button
-      type="button"
-      disabled={disabled || update.isPending}
-      onClick={() => update.mutate({ isArchived: false })}
-      className="btn-secondary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-      title={disabled ? "Keine Schreibrechte" : "Archivierung aufheben"}
-    >
-      <ArchiveRestore size={12} /> Reaktivieren
-    </button>
+    <SharedRestoreButton
+      compact
+      disabled={disabled}
+      loading={update.isPending}
+      onConfirm={() => update.mutateAsync({ isArchived: false })}
+    />
   );
 }
 

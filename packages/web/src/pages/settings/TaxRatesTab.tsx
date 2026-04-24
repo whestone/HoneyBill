@@ -8,6 +8,18 @@ import { Modal } from "@/components/ui/Modal";
 import { DecimalInput } from "@/components/ui/DecimalInput";
 import { useCan } from "@/api/hooks/usePermissions";
 import { Label } from "@/components/ui/Label";
+import { IconButton } from "@/components/ui/IconButton";
+import { FilterCheckbox } from "@/components/ui/SearchToolbar";
+import { useColumnVisibility, type ColumnDef } from "@/components/ui/ColumnToggle";
+
+const TAX_RATE_COLUMNS: ColumnDef[] = [
+  { key: "name", label: "Name", alwaysVisible: true },
+  { key: "rate", label: "Satz" },
+  { key: "category", label: "Kategorie" },
+  { key: "validFrom", label: "Gültig ab" },
+  { key: "validTo", label: "Gültig bis" },
+  { key: "default", label: "Standard" },
+];
 
 const TAX_CATEGORIES = [
   { value: "S", label: "S – Normalsatz" },
@@ -26,6 +38,7 @@ export function TaxRatesTab() {
   const [editing, setEditing] = useState<TaxRate | null>(null);
 
   const [showExpired, setShowExpired] = useState(false);
+  const { isVisible, columnToggle } = useColumnVisibility("tax-rates", TAX_RATE_COLUMNS);
   const { data: allTaxRates, isLoading } = useQuery<TaxRate[]>({
     queryKey: ["tax-rates", "all"],
     queryFn: () => api.get("/tax-rates"),
@@ -48,14 +61,12 @@ export function TaxRatesTab() {
           Steuersätze mit Gültigkeitszeiträumen für korrekte historische Rückrechnung.
         </p>
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 text-xs text-gray-500">
-            <input
-              type="checkbox"
-              checked={showExpired}
-              onChange={(e) => setShowExpired(e.target.checked)}
-            />
-            Abgelaufene anzeigen
-          </label>
+          <FilterCheckbox
+            label="Abgelaufene anzeigen"
+            checked={showExpired}
+            onChange={setShowExpired}
+          />
+          {columnToggle}
           <button
             onClick={() => setShowCreate(true)}
             disabled={!canEdit}
@@ -73,12 +84,12 @@ export function TaxRatesTab() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100">
-                <th className="table-header">Name</th>
-                <th className="table-header text-right">Satz</th>
-                <th className="table-header">Kategorie</th>
-                <th className="table-header">Gültig ab</th>
-                <th className="table-header">Gültig bis</th>
-                <th className="table-header">Standard</th>
+                {isVisible("name") && <th className="table-header">Name</th>}
+                {isVisible("rate") && <th className="table-header text-right">Satz</th>}
+                {isVisible("category") && <th className="table-header">Kategorie</th>}
+                {isVisible("validFrom") && <th className="table-header">Gültig ab</th>}
+                {isVisible("validTo") && <th className="table-header">Gültig bis</th>}
+                {isVisible("default") && <th className="table-header">Standard</th>}
                 <th className="table-header"></th>
               </tr>
             </thead>
@@ -90,40 +101,40 @@ export function TaxRatesTab() {
                   : null;
                 return (
                 <tr key={tr.id} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="table-cell font-medium">{tr.name}</td>
-                  <td className="table-cell text-right font-mono">{parseFloat(tr.ratePercent).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} %</td>
-                  <td className="table-cell text-gray-500 text-xs">{tr.taxCategory}</td>
-                  <td className="table-cell text-gray-500 text-xs">{tr.validFrom}</td>
-                  <td className="table-cell text-gray-500 text-xs">{tr.validTo ?? "—"}</td>
+                  {isVisible("name") && <td className="table-cell font-medium">{tr.name}</td>}
+                  {isVisible("rate") && <td className="table-cell text-right font-mono">{parseFloat(tr.ratePercent).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} %</td>}
+                  {isVisible("category") && <td className="table-cell text-gray-500 text-xs">{tr.taxCategory}</td>}
+                  {isVisible("validFrom") && <td className="table-cell text-gray-500 text-xs">{tr.validFrom}</td>}
+                  {isVisible("validTo") && <td className="table-cell text-gray-500 text-xs">{tr.validTo ?? "—"}</td>}
+                  {isVisible("default") && (
+                    <td className="table-cell">
+                      {tr.isDefault && (
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs bg-honey-100 text-honey-700">
+                          Standard
+                        </span>
+                      )}
+                    </td>
+                  )}
                   <td className="table-cell">
-                    {tr.isDefault && (
-                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs bg-honey-100 text-honey-700">
-                        Standard
-                      </span>
-                    )}
-                  </td>
-                  <td className="table-cell">
-                    <div className="flex items-center gap-1">
-                      <button
+                    <div className="flex items-center gap-1 justify-end">
+                      <IconButton
+                        icon={Pencil}
+                        label="Bearbeiten"
+                        variant="primary"
                         onClick={() => setEditing(tr)}
                         disabled={!canEdit}
-                        className="text-gray-300 hover:text-honey-600 transition-colors p-1 disabled:opacity-40 disabled:cursor-not-allowed"
-                        title={canEdit ? "Bearbeiten" : "Keine Schreibrechte"}
-                      >
-                        <Pencil size={14} />
-                      </button>
-                      <button
-                        onClick={async () => { if (await confirm(`Steuersatz "${tr.name}" löschen?`, { title: "Steuersatz löschen", confirmLabel: "Löschen" })) deleteTaxRate.mutate(tr.id); }}
+                      />
+                      <IconButton
+                        icon={Trash2}
+                        label={!canEdit ? "Keine Schreibrechte" : (deleteBlockedReason ?? "Löschen")}
+                        variant="danger"
                         disabled={!!deleteBlockedReason || !canEdit}
-                        className={
-                          deleteBlockedReason || !canEdit
-                            ? "text-gray-200 cursor-not-allowed p-1"
-                            : "text-gray-300 hover:text-red-500 transition-colors p-1"
-                        }
-                        title={!canEdit ? "Keine Schreibrechte" : (deleteBlockedReason ?? "Löschen")}
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                        onClick={async () => {
+                          if (await confirm(`Steuersatz "${tr.name}" löschen?`, { title: "Steuersatz löschen", confirmLabel: "Löschen", danger: true })) {
+                            deleteTaxRate.mutate(tr.id);
+                          }
+                        }}
+                      />
                     </div>
                   </td>
                 </tr>
